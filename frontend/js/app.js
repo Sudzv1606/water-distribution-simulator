@@ -1,3 +1,10 @@
+// 🌟 Dynamic BASE_URL Configuration
+const BASE_URL = window.location.hostname === "localhost"
+  ? "http://localhost:8000"
+  : "https://water-sim-backend.onrender.com";
+
+console.log('🔧 Using BASE_URL:', BASE_URL);
+
 const statusEl = document.getElementById('status');
 const alertEl = document.getElementById('alert');
 const logEl = document.getElementById('log');
@@ -89,7 +96,7 @@ function setAlert(score, location){
 
 async function seedHistory(){
 	try {
-		const res = await fetch('http://localhost:8000/api/readings/recent?limit=60');
+		const res = await fetch(`${BASE_URL}/api/readings/recent?limit=60`);
 		const rows = await res.json();
 		const sorted = rows.slice().reverse();
 		sorted.forEach(r => {
@@ -100,7 +107,7 @@ async function seedHistory(){
 }
 
 function connect(){
-	const ws = new WebSocket('ws://localhost:8000/ws');
+	const ws = new WebSocket(BASE_URL.replace("http", "ws") + "/ws");
 	ws.onopen = () => { statusEl.textContent = 'Connected'; statusEl.style.background = '#10341f'; statusEl.style.borderColor = '#1f6f3b'; appendLog('WS connected'); };
 	ws.onmessage = (ev) => {
 		if (paused) return;
@@ -171,7 +178,7 @@ async function drawNetwork(){
 		canvas.height = 260;
 		const ctx = canvas.getContext('2d');
 
-		const res = await fetch('http://localhost:8000/api/network');
+		const res = await fetch(`${BASE_URL}/api/network`);
 		const net = await res.json();
 		netCache = net;
 		renderNetwork();
@@ -231,7 +238,7 @@ function renderNetwork(nodePressures){
 
 async function refreshAnomalies(){
 	try{
-		const res = await fetch('http://localhost:8000/api/anomalies/recent?limit=10');
+		const res = await fetch(`${BASE_URL}/api/anomalies/recent?limit=10`);
 		const rows = await res.json();
 		const tbody = document.querySelector('#anomTable tbody');
 		tbody.innerHTML = '';
@@ -451,14 +458,14 @@ const leakPipe = document.getElementById('leakPipe');
 const leakSev = document.getElementById('leakSev');
 leakBtn.onclick = async () => {
 	window.lastLeakPipe = leakPipe.value;
-	try { const res = await fetch('http://localhost:8000/scenarios/leak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pipe_id: leakPipe.value, severity: Number(leakSev.value) }) }); appendLog('Leak response: ' + res.status); } catch(err) { appendLog('Leak error: ' + err); }
+	try { const res = await fetch(`${BASE_URL}/scenarios/leak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pipe_id: leakPipe.value, severity: Number(leakSev.value) }) }); appendLog('Leak response: ' + res.status); } catch(err) { appendLog('Leak error: ' + err); }
 };
 
 const spikeBtn = document.getElementById('spikeBtn');
 const spikeMul = document.getElementById('spikeMul');
 const spikeDur = document.getElementById('spikeDur');
 spikeBtn.onclick = async () => {
-	try { const res = await fetch('http://localhost:8000/scenarios/demand-spike', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ multiplier: Number(spikeMul.value), duration_s: Number(spikeDur.value) }) }); appendLog('Spike response: ' + res.status); } catch(err) { appendLog('Spike error: ' + err); }
+	try { const res = await fetch(`${BASE_URL}/scenarios/demand-spike`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ multiplier: Number(spikeMul.value), duration_s: Number(spikeDur.value) }) }); appendLog('Spike response: ' + res.status); } catch(err) { appendLog('Spike error: ' + err); }
 };
 
 // Mode Toggle Variables - Declare early
