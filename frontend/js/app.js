@@ -1,11 +1,8 @@
-// 🌟 Dynamic BASE_URL Configuration - Single Declaration
-const BASE_URL = window.location.hostname === "localhost"
-  ? "http://localhost:8000"
-  : "https://water-sim-backend.onrender.com";
+// 🌟 Production BASE_URL Configuration
+const BASE_URL = "https://water-sim-backend.onrender.com";
 
-// 🌟 Alternative BASE_URL for testing different endpoints
-// Uncomment the line below if you need to test with a different backend URL
-// const BASE_URL = "https://water-sim-backend.onrender.com";
+// 🌟 WebSocket URL for real-time updates (fallback to polling)
+const WS_URL = "wss://water-sim-backend.onrender.com/ws";
 
 // 🌟 Production-Ready Polling System (No WebSocket dependency)
 let pollingInterval = null;
@@ -299,8 +296,14 @@ async function refreshAnomalies(){
 	}
 }
 
+// 🌟 Initialize WebSocket connection (with polling fallback)
+setTimeout(() => {
+    console.log('🔌 Attempting WebSocket connection...');
+    testWebSocketConnection();
+}, 1000);
+
 seedHistory();
-startPollingSystem(); // Use polling instead of WebSocket
+startPollingSystem(); // Use polling as fallback
 drawNetwork();
 refreshAnomalies();
 setInterval(refreshAnomalies, 10000);
@@ -675,9 +678,35 @@ function setupSimulationEventListeners() {
     const leakSlider = document.getElementById('simLeakSev');
     const leakValue = document.getElementById('simLeakValue');
     if (leakSlider && leakValue) {
+        // Update value display when slider changes
         leakSlider.oninput = (e) => {
-            leakValue.textContent = e.target.value;
+            const value = parseFloat(e.target.value);
+            leakValue.textContent = value.toFixed(1);
+            console.log('🔧 Slider value changed to:', value, 'slider value:', e.target.value);
         };
+
+        // Also update on change event to ensure value is captured
+        leakSlider.onchange = (e) => {
+            const value = parseFloat(e.target.value);
+            leakValue.textContent = value.toFixed(1);
+            console.log('✅ Slider value confirmed:', value, 'slider value:', e.target.value);
+        };
+
+        // Add mousemove event for real-time updates
+        leakSlider.onmousemove = (e) => {
+            const value = parseFloat(e.target.value);
+            leakValue.textContent = value.toFixed(1);
+            console.log('🎯 Slider mouse move:', value);
+        };
+
+        // Debug: Log initial values
+        console.log('🎛️ Initial slider setup:', {
+            sliderValue: leakSlider.value,
+            displayValue: leakValue.textContent,
+            sliderMin: leakSlider.min,
+            sliderMax: leakSlider.max,
+            sliderStep: leakSlider.step
+        });
     }
 
     // Demand multiplier slider
@@ -868,8 +897,7 @@ function resetSimulation() {
     simDemandMultiplier = 1.0;
     document.getElementById('simDemandMul').value = 1.0;
     document.getElementById('simDemandValue').textContent = '1.0x';
-    document.getElementById('simLeakSev').value = 0.5;
-    document.getElementById('simLeakValue').textContent = '0.5';
+    // Note: Removed slider reset to preserve user's current leak severity setting
 
     clearAllLeaks();
     updateSimulationStatus('Simulation reset complete');
@@ -1441,6 +1469,122 @@ function manualRedrawNetwork() {
     });
 
     console.log('✅ DIRECT: Manual redraw completed');
+}
+
+// 🌟 WebSocket Connection Test Function
+function testWebSocketConnection() {
+    console.log('🔌 Testing WebSocket connection to:', WS_URL);
+
+    try {
+        const ws = new WebSocket(WS_URL);
+
+        ws.onopen = function(event) {
+            console.log('✅ WebSocket connected successfully');
+            statusEl.textContent = 'Connected (WebSocket)';
+            statusEl.style.background = '#10341f';
+            statusEl.style.borderColor = '#1f6f3b';
+            appendLog('🔌 WebSocket connected successfully');
+
+            // Send a test message
+            ws.send(JSON.stringify({ type: 'test', message: 'Hello from frontend' }));
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('📨 WebSocket message received:', data);
+
+                // Update charts with real-time WebSocket data
+                if (data.spectral_freq) pushPoint(spectralChart, data.spectral_freq);
+                if (data.kurtosis && data.skewness) pushDualPoint(statsChart, data.kurtosis, data.skewness);
+                if (data.rms_power) pushPoint(rmsChart, data.rms_power);
+
+                // Update KPIs
+                if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
+                if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
+
+                // Update bottom panel data if available
+                if (window.updateBottomPanelData) {
+                    window.updateBottomPanelData(data);
+                }
+
+                // Update map with sensor data if available
+                if (window.updateMapWithSensorData) {
+                    window.updateMapWithSensorData(data);
+                }
+
+                appendLog(`📊 WebSocket: Freq=${data.spectral_freq?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}`);
+
+            } catch (error) {
+                console.error('❌ Error parsing WebSocket message:', error);
+                appendLog('❌ WebSocket message parse error: ' + error.message);
+            }
+        };
+
+        ws.onclose = function(event) {
+            console.log('🔌 WebSocket disconnected:', event.code, event.reason);
+            appendLog('🔌 WebSocket disconnected');
+
+            // Fallback to polling if WebSocket fails
+            if (!pollingInterval) {
+                console.log('🔄 Falling back to polling mode');
+                startPollingSystem();
+            }
+        };
+
+        ws.onerror = function(error) {
+            console.error('❌ WebSocket error:', error);
+            appendLog('❌ WebSocket error - falling back to polling');
+
+            // Fallback to polling if WebSocket fails
+            if (!pollingInterval) {
+                startPollingSystem();
+            }
+        };
+
+        // Store WebSocket globally for cleanup
+        window.activeWebSocket = ws;
+        return ws;
+
+    } catch (error) {
+        console.error('❌ Failed to create WebSocket connection:', error);
+        appendLog('❌ WebSocket creation failed - using polling mode');
+
+        // Fallback to polling
+        if (!pollingInterval) {
+            startPollingSystem();
+        }
+        return null;
+    }
+}
+
+// 🌟 Enhanced Error Handling for API Calls
+function makeRobustAPICall(url, options = {}) {
+    return fetch(url, {
+        ...options,
+        // Add timeout
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .catch(error => {
+        console.error(`❌ API call failed for ${url}:`, error);
+
+        // Provide user-friendly error messages
+        if (error.name === 'AbortError') {
+            appendLog(`❌ Request timeout for ${url}`);
+        } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+            appendLog(`❌ Network error for ${url} - check if backend is running`);
+        } else {
+            appendLog(`❌ API error for ${url}: ${error.message}`);
+        }
+
+        throw error;
+    });
 }
 
 // Initialize simulation effects
