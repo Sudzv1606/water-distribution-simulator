@@ -286,55 +286,7 @@
 								</div>
 							</div>
 
-							<!-- ⚡ Demand Management Section -->
-							<div class="control-card">
-								<h3>⚡ Demand Management</h3>
-								<div class="control-group">
-									<label>Zone Selector:</label>
-									<select id="demandZone" class="zone-selector">
-										<option value="ZONE_1">District A (Teynampet)</option>
-										<option value="ZONE_2">District B (Kilpauk)</option>
-										<option value="ZONE_3">District C (Saidapet)</option>
-									</select>
-								</div>
-								<div class="control-group">
-									<label>Demand Multiplier:</label>
-									<div class="slider-container">
-										<input id="simDemandMul" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
-										<span id="simDemandValue">1.0x</span>
-									</div>
-								</div>
-								<div class="control-group">
-									<label>Duration (sec):</label>
-									<input id="simDemandDur" type="number" min="10" max="300" value="60" />
-								</div>
-								<div class="control-group">
-									<button id="simDemandBtn" class="btn btn-warning">⚡ Apply Demand Spike</button>
-								</div>
-							</div>
 
-							<!-- 🎛️ Quick Scenarios -->
-							<div class="control-card">
-								<h3>🎛️ Quick Scenarios</h3>
-								<div class="quick-scenarios">
-									<div class="quick-scenario">
-										<label>Quick Leak:</label>
-										<input id="quickLeakPipe" placeholder="P1" class="quick-input" />
-										<input id="quickLeakSev" type="number" min="0" max="1" step="0.1" value="0.5" placeholder="0.5" class="quick-input" />
-										<button id="quickLeakBtn" class="btn btn-small">🚰 Inject</button>
-									</div>
-									<div class="quick-scenario">
-										<label>Demand Spike:</label>
-										<input id="quickDemandMul" type="number" step="0.1" value="1.2" placeholder="1.2" class="quick-input" />
-										<input id="quickDemandDur" type="number" value="120" placeholder="120" class="quick-input" />
-										<button id="quickDemandBtn" class="btn btn-small">⚡ Spike</button>
-									</div>
-								</div>
-								<div class="control-group">
-									<button id="simPauseBtn" class="btn">⏸️ Pause Simulation</button>
-									<button id="simResetBtn" class="btn btn-secondary">🔄 Reset Network</button>
-								</div>
-							</div>
 						</div>
 					</div>
 
@@ -363,7 +315,7 @@
 								</div>
 							</div>
 							<div class="metric-card">
-								<h4>🌊 Flow Rate Monitoring</h4>
+								<h4>� Flow Rate Monitoring</h4>
 								<div class="metric-grid">
 									<div class="metric-item">
 										<span class="metric-label">Pipe F1</span>
@@ -390,7 +342,7 @@
 					<div class="tab-content" id="acousticTab">
 						<div class="data-grid">
 							<div class="metric-card">
-								<h4>🔊 Spectral Analysis</h4>
+								<h4>� Spectral Analysis</h4>
 								<div class="metric-grid">
 									<div class="metric-item">
 										<span class="metric-label">Dominant Freq</span>
