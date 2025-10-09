@@ -14,7 +14,15 @@ app = FastAPI(title="Smart Water Digital Twin Prototype")
 
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["*"],
+	allow_origins=[
+		"https://water-distribution-simulator.onrender.com",
+		"https://sudzv1606.github.io",
+		"http://localhost:3000",
+		"http://localhost:8000",
+		"http://127.0.0.1:8000",
+		"http://localhost:5500",  # Live Server
+		"*"
+	],
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
