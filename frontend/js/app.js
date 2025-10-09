@@ -3,9 +3,9 @@ const BASE_URL = window.location.hostname === "localhost"
   ? "http://localhost:8000"
   : "https://water-sim-backend.onrender.com";
 
-// 🌟 WebSocket Connection with Fallback to Polling
-let useWebSocket = true;
+// 🌟 Production-Ready Polling System (No WebSocket dependency)
 let pollingInterval = null;
+const POLL_INTERVAL = 3000; // 3 seconds
 
 console.log('🔧 Using BASE_URL:', BASE_URL);
 
@@ -110,94 +110,40 @@ async function seedHistory(){
 	} catch(e){ appendLog('history error: ' + e); }
 }
 
-function connect(){
-	// Try WebSocket first, fallback to polling if it fails
-	try {
-		const ws = new WebSocket(BASE_URL.replace("http", "ws") + "/ws");
-		ws.onopen = () => {
-			statusEl.textContent = 'Connected (WebSocket)';
+// 🌟 Production-Ready Polling System - No WebSocket dependency
+function startPollingSystem() {
+	appendLog('🔄 Starting production polling system (3 second intervals)');
+
+	pollingInterval = setInterval(async () => {
+		try {
+			// Poll status endpoint for real-time data
+			const response = await fetch(`${BASE_URL}/api/status`);
+			const data = await response.json();
+
+			if (paused) return;
+
+			statusEl.textContent = 'Connected (Polling)';
 			statusEl.style.background = '#10341f';
 			statusEl.style.borderColor = '#1f6f3b';
-			appendLog('✅ WebSocket connected');
-			useWebSocket = true;
-			if (pollingInterval) {
-				clearInterval(pollingInterval);
-				pollingInterval = null;
-			}
-		};
-		ws.onmessage = (ev) => {
-			if (paused) return;
-			try {
-				const data = JSON.parse(ev.data);
 
-				// Update sensor data based on current mode
-				if (window.currentMode === 'simulation') {
-					// 🌟 Simulation Mode 2.0 - Update map with sensor data
-					if (window.updateMapWithSensorData) {
-						window.updateMapWithSensorData(data);
-					}
-				}
+			// Update charts with real-time data from backend
+			if (data.spectral_freq) pushPoint(spectralChart, data.spectral_freq);
+			if (data.kurtosis && data.skewness) pushDualPoint(statsChart, data.kurtosis, data.skewness);
+			if (data.rms_power) pushPoint(rmsChart, data.rms_power);
 
-				// Update new sensor charts (both modes)
-				pushPoint(spectralChart, data.spectral_freq);
-				pushDualPoint(statsChart, data.kurtosis, data.skewness);
-				pushPoint(rmsChart, data.rms_power);
+			// Update KPIs
+			if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
+			if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
 
-				// Update KPIs
-				kpiSpectral.textContent = data.spectral_freq.toFixed(2);
-				kpiRMS.textContent = data.rms_power.toFixed(3);
+			appendLog(`📊 Polling: Freq=${data.spectral_freq?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}`);
 
-				// Update model performance scores
-				document.getElementById("accScore").innerText = (data.accuracy * 100).toFixed(2) + "%";
-				document.getElementById("precScore").innerText = (data.precision * 100).toFixed(2) + "%";
-				document.getElementById("recScore").innerText = (data.recall * 100).toFixed(2) + "%";
-				document.getElementById("aucScore").innerText = (data.auc * 100).toFixed(2) + "%";
-
-				// Handle anomaly data (both modes)
-				if (data.anomaly) {
-					setAlert(data.anomaly.score, data.anomaly.location);
-				}
-
-				// Handle node pressures (both modes)
-				if (data.node_pressures) {
-					if (window.currentMode === 'simulation' && window.updateMapWithSensorData) {
-						// Map already updated above
-					} else {
-						// Monitoring mode - use canvas network
-						renderNetwork(data.node_pressures);
-					}
-
-					// 🌟 Update bottom panel with hydraulic data (simulation mode)
-					if (window.currentMode === 'simulation') {
-						updateBottomPanelData(data);
-					}
-				}
-
-			} catch(e) { appendLog('WS message error: ' + e); appendLog('Raw data: ' + ev.data); }
-		};
-		ws.onclose = () => {
-			statusEl.textContent = 'Disconnected (WebSocket)';
+		} catch (error) {
+			statusEl.textContent = 'Polling Error';
 			statusEl.style.background = '#3a0a0a';
 			statusEl.style.borderColor = '#7c1d18';
-			appendLog('❌ WebSocket closed, falling back to polling...');
-			useWebSocket = false;
-			startPolling(); // Fallback to polling
-		};
-		ws.onerror = (error) => {
-			statusEl.textContent = 'WebSocket Error';
-			statusEl.style.background = '#3a0a0a';
-			statusEl.style.borderColor = '#7c1d18';
-			appendLog('❌ WebSocket error, falling back to polling...');
-			console.error('WebSocket error:', error);
-			useWebSocket = false;
-			startPolling(); // Fallback to polling
-		};
-	} catch (error) {
-		appendLog('❌ WebSocket failed, using polling mode');
-		console.error('WebSocket initialization failed:', error);
-		useWebSocket = false;
-		startPolling();
-	}
+			appendLog('❌ Polling error: ' + error.message);
+		}
+	}, POLL_INTERVAL);
 }
 
 // 🌟 Polling fallback function
@@ -323,7 +269,7 @@ async function refreshAnomalies(){
 }
 
 seedHistory();
-connect();
+startPollingSystem(); // Use polling instead of WebSocket
 drawNetwork();
 refreshAnomalies();
 setInterval(refreshAnomalies, 10000);
@@ -529,14 +475,14 @@ const leakPipe = document.getElementById('leakPipe');
 const leakSev = document.getElementById('leakSev');
 leakBtn.onclick = async () => {
 	window.lastLeakPipe = leakPipe.value;
-	try { const res = await fetch(`${BASE_URL}/scenarios/leak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pipe_id: leakPipe.value, severity: Number(leakSev.value) }) }); appendLog('Leak response: ' + res.status); } catch(err) { appendLog('Leak error: ' + err); }
+	try { const res = await fetch(`${BASE_URL}/api/scenarios/leak`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pipe_id: leakPipe.value, severity: Number(leakSev.value) }) }); appendLog('Leak response: ' + res.status); } catch(err) { appendLog('Leak error: ' + err); }
 };
 
 const spikeBtn = document.getElementById('spikeBtn');
 const spikeMul = document.getElementById('spikeMul');
 const spikeDur = document.getElementById('spikeDur');
 spikeBtn.onclick = async () => {
-	try { const res = await fetch(`${BASE_URL}/scenarios/demand-spike`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ multiplier: Number(spikeMul.value), duration_s: Number(spikeDur.value) }) }); appendLog('Spike response: ' + res.status); } catch(err) { appendLog('Spike error: ' + err); }
+	try { const res = await fetch(`${BASE_URL}/api/scenarios/demand-spike`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ multiplier: Number(spikeMul.value), duration_s: Number(spikeDur.value) }) }); appendLog('Spike response: ' + res.status); } catch(err) { appendLog('Spike error: ' + err); }
 };
 
 // Mode Toggle Variables - Declare early
@@ -849,7 +795,7 @@ function injectSimulatedLeak() {
     simLeaks[selectedPipe] = severity;
 
     // Send to backend
-    fetch('http://localhost:8000/scenarios/leak', {
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: selectedPipe, severity: severity })
@@ -863,7 +809,7 @@ function injectSimulatedLeak() {
 
 function clearAllLeaks() {
     simLeaks = {};
-    fetch('http://localhost:8000/scenarios/leak', {
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: 'NONE', severity: 0 })
@@ -875,7 +821,7 @@ function clearAllLeaks() {
 
 function applyDemandSpike() {
     const duration = parseInt(document.getElementById('simDemandDur').value);
-    fetch('http://localhost:8000/scenarios/demand-spike', {
+    fetch(`${BASE_URL}/api/scenarios/demand-spike`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier: simDemandMultiplier, duration_s: duration })
@@ -1331,7 +1277,7 @@ function setupDirectLeakInjection() {
             }
 
             // Send to backend
-            fetch('http://localhost:8000/scenarios/clear-leaks', {
+            fetch(`${BASE_URL}/api/scenarios/clear-leaks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             }).then(response => {

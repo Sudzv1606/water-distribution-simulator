@@ -3,6 +3,11 @@
  * Interactive canvas-based network diagram for water distribution system
  */
 
+// 🌟 Dynamic BASE_URL Configuration
+const BASE_URL = window.location.hostname === "localhost"
+  ? "http://localhost:8000"
+  : "https://water-sim-backend.onrender.com";
+
 // Global network variables
 let epanetCanvas;
 let ctx;
@@ -1480,7 +1485,7 @@ function injectEpanetLeak(pipeId, severity) {
 
     // Send to backend
     console.log('🌐 DEBUG: Sending to backend...');
-    fetch('http://localhost:8000/scenarios/leak', {
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: pipeId, severity: severity })
@@ -1525,7 +1530,7 @@ function applyEpanetDemandSpike(multiplier, duration) {
     });
 
     // Send to backend
-    fetch('http://localhost:8000/scenarios/demand-spike', {
+    fetch(`${BASE_URL}/api/scenarios/demand-spike`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier: multiplier, duration_s: duration })
@@ -1557,7 +1562,7 @@ function clearEpanetScenarios() {
     });
 
     // Send clear command to backend
-    fetch('http://localhost:8000/scenarios/leak', {
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: 'NONE', severity: 0 })
