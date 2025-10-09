@@ -34,6 +34,11 @@ app.add_middleware(
 		# Allow all localhost origins for development
 		"*localhost*",
 		"*127.0.0.1*",
+		# Allow Railway deployments
+		"https://*.up.railway.app",
+		"https://*.railway.app",
+		# Temporary: Allow all origins for Railway deployment testing
+		"*",
 	],
 	allow_credentials=True,
 	allow_methods=["*"],
