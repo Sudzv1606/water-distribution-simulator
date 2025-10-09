@@ -15,6 +15,7 @@ app = FastAPI(title="Smart Water Digital Twin Prototype")
 app.add_middleware(
 	CORSMiddleware,
 	allow_origins=[
+		"https://water-distribution-simulator-production.up.railway.app",  # Frontend Railway URL
 		"https://water-distribution-simulator.onrender.com",
 		"https://sudzv1606.github.io",
 		"http://localhost:3000",

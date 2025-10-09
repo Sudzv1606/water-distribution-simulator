@@ -1,8 +1,8 @@
 // 🌟 Railway Backend Configuration - UPDATE THIS URL AFTER DEPLOYMENT
-const BASE_URL = "https://your-backend-project-name.up.railway.app";
+const BASE_URL = "https://water-distribution-simulator-production.up.railway.app";
 
 // 🌟 WebSocket URL for real-time updates (fallback to polling)
-const WS_URL = "wss://your-backend-project-name.up.railway.app/ws";
+const WS_URL = "wss://water-distribution-simulator-production.up.railway.app/ws";
 
 // 🌟 Production-Ready Polling System (No WebSocket dependency)
 let pollingInterval = null;
