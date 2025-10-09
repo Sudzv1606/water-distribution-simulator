@@ -3,6 +3,10 @@ const BASE_URL = window.location.hostname === "localhost"
   ? "http://localhost:8000"
   : "https://water-sim-backend.onrender.com";
 
+// 🌟 Alternative BASE_URL for testing different endpoints
+// Uncomment the line below if you need to test with a different backend URL
+// const BASE_URL = "https://water-sim-backend.onrender.com";
+
 // 🌟 Production-Ready Polling System (No WebSocket dependency)
 let pollingInterval = null;
 const POLL_INTERVAL = 3000; // 3 seconds
@@ -134,6 +138,24 @@ function startPollingSystem() {
 			// Update KPIs
 			if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
 			if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
+
+			// Update Model Performance Metrics
+			if (data.accuracy !== undefined) {
+				const accScoreEl = document.getElementById('accScore');
+				if (accScoreEl) accScoreEl.textContent = (data.accuracy * 100).toFixed(2) + '%';
+			}
+			if (data.precision !== undefined) {
+				const precScoreEl = document.getElementById('precScore');
+				if (precScoreEl) precScoreEl.textContent = (data.precision * 100).toFixed(2) + '%';
+			}
+			if (data.recall !== undefined) {
+				const recScoreEl = document.getElementById('recScore');
+				if (recScoreEl) recScoreEl.textContent = (data.recall * 100).toFixed(2) + '%';
+			}
+			if (data.auc !== undefined) {
+				const aucScoreEl = document.getElementById('aucScore');
+				if (aucScoreEl) aucScoreEl.textContent = (data.auc * 100).toFixed(2) + '%';
+			}
 
 			appendLog(`📊 Polling: Freq=${data.spectral_freq?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}`);
 
@@ -977,7 +999,7 @@ function quickLeakInjection() {
     const pipeId = document.getElementById('quickLeakPipe').value;
     const severity = parseFloat(document.getElementById('quickLeakSev').value);
 
-    fetch('http://localhost:8000/scenarios/leak', {
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: pipeId, severity: severity })
@@ -993,7 +1015,7 @@ function quickDemandSpike() {
     const multiplier = parseFloat(document.getElementById('quickDemandMul').value);
     const duration = parseInt(document.getElementById('quickDemandDur').value);
 
-    fetch('http://localhost:8000/scenarios/demand-spike', {
+    fetch(`${BASE_URL}/api/scenarios/demand-spike`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier: multiplier, duration_s: duration })
@@ -1226,7 +1248,7 @@ function setupDirectLeakInjection() {
                 forceLeakVisualUpdate(pipeId, severity);
 
                 // Send to backend
-                fetch('http://localhost:8000/scenarios/leak', {
+                fetch(`${BASE_URL}/api/scenarios/leak`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pipe_id: pipeId, severity: severity })

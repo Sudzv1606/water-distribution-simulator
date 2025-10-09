@@ -21,7 +21,6 @@ app.add_middleware(
 		"http://localhost:8000",
 		"http://127.0.0.1:8000",
 		"http://localhost:5500",  # Live Server
-		"*"
 	],
 	allow_credentials=True,
 	allow_methods=["*"],
@@ -38,10 +37,25 @@ async def serve_frontend():
     """Serve the main frontend interface"""
     return FileResponse("frontend/index.html")
 
-# 🌟 API STATUS ROUTE - Health check
+# 🌟 API STATUS ROUTE - Real-time data endpoint
 @app.get("/api/status")
 async def get_status():
-    """Get system status"""
+    """Get real-time system status with actual simulated data"""
+    # Generate real-time data using the simulator
+    current_reading = simulator._generate_reading()
+
+    # Extract sensor values for frontend compatibility
+    spectral_freq = next((s["value"] for s in current_reading["sensors"] if s["id"] == "S1"), 0)
+    rms_power = next((s["value"] for s in current_reading["sensors"] if s["id"] == "RMS1"), 0)
+    kurtosis = next((s["value"] for s in current_reading["sensors"] if s["id"] == "K1"), 0)
+    skewness = next((s["value"] for s in current_reading["sensors"] if s["id"] == "SK1"), 0)
+
+    # Calculate additional metrics for frontend
+    accuracy = next((s["value"] for s in current_reading["sensors"] if s["id"] == "ACC1"), 0)
+    precision = next((s["value"] for s in current_reading["sensors"] if s["id"] == "PREC1"), 0)
+    recall = next((s["value"] for s in current_reading["sensors"] if s["id"] == "REC1"), 0)
+    auc = next((s["value"] for s in current_reading["sensors"] if s["id"] == "AUC1"), 0)
+
     return {
         "status": "running",
         "service": "Smart Water Digital Twin",
@@ -53,11 +67,23 @@ async def get_status():
             "Anomaly Detection",
             "EPANET Modeling"
         ],
-        # 🌟 Add real-time data for frontend polling
-        "spectral_freq": 45.2 + (hash(str(simulator)) % 100) / 10,
-        "rms_power": 2.3 + (hash(str(simulator)) % 50) / 10,
-        "kurtosis": 2.8 + (hash(str(simulator)) % 30) / 10,
-        "skewness": 0.5 + (hash(str(simulator)) % 20) / 10
+        # 🌟 Real fluctuating data from simulator
+        "spectral_freq": round(spectral_freq, 1),
+        "rms_power": round(rms_power, 2),
+        "kurtosis": round(kurtosis, 3),
+        "skewness": round(skewness, 3),
+        "accuracy": round(accuracy, 3),
+        "precision": round(precision, 3),
+        "recall": round(recall, 3),
+        "auc": round(auc, 3),
+        # 🌟 Add node pressures for bottom panel
+        "node_pressures": current_reading.get("node_pressures", {}),
+        # 🌟 Add calculated acoustic metrics
+        "snr": calculate_snr(current_reading),
+        "thd": calculate_thd(current_reading),
+        "crest_factor": calculate_crest_factor(current_reading),
+        "dynamic_range": calculate_dynamic_range(current_reading),
+        "f1_score": calculate_f1_score(current_reading)
     }
 
 app.include_router(api_router, prefix="/api")
