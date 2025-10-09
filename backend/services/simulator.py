@@ -249,38 +249,30 @@ class DataSimulator:
 		}
 
 	def _generate_ml_metrics(self, timestep: int) -> Dict[str, float]:
-		"""Generate realistic ML model performance metrics"""
+		"""Generate simple ML model performance metrics for leak confidence"""
 
-		# Base performance levels
-		base_accuracy = 0.90
-		base_precision = 0.85
-		base_recall = 0.88
-		base_auc = 0.91
+		# Simple baseline - low confidence when no leak
+		base_accuracy = 0.65  # Low baseline accuracy
+		base_precision = 0.60
+		base_recall = 0.62
+		base_auc = 0.68
 
-		# Add temporal variation (model performance can drift over time)
-		time_factor = math.sin(timestep / 10000) * 0.02
+		# Add small random variation
+		variation = random.uniform(-0.05, 0.05)
 
-		# Add scenario-based variation
 		if self._leak is not None:
-			# Leak scenarios typically improve detection metrics
-			leak_factor = self._leak["severity"] * 0.05
-			accuracy = min(0.98, base_accuracy + leak_factor + time_factor + random.uniform(-0.01, 0.01))
-			precision = min(0.95, base_precision + leak_factor * 0.8 + time_factor + random.uniform(-0.01, 0.01))
-			recall = min(0.96, base_recall + leak_factor * 1.2 + time_factor + random.uniform(-0.01, 0.01))
-			auc = min(0.98, base_auc + leak_factor + time_factor + random.uniform(-0.01, 0.01))
-		elif int(timestep/1000) < self._demand_until_ts:
-			# Demand spikes can confuse the model initially
-			demand_factor = (self._demand_multiplier - 1.0) * 0.02
-			accuracy = max(0.85, base_accuracy - demand_factor + time_factor + random.uniform(-0.02, 0.02))
-			precision = max(0.80, base_precision - demand_factor * 0.5 + time_factor + random.uniform(-0.02, 0.02))
-			recall = max(0.83, base_recall - demand_factor * 0.8 + time_factor + random.uniform(-0.02, 0.02))
-			auc = max(0.86, base_auc - demand_factor + time_factor + random.uniform(-0.02, 0.02))
+			# High confidence when leak is present
+			leak_boost = self._leak["severity"] * 0.3  # Strong boost based on severity
+			accuracy = min(0.95, base_accuracy + leak_boost + variation)
+			precision = min(0.93, base_precision + leak_boost * 0.9 + variation)
+			recall = min(0.94, base_recall + leak_boost * 1.1 + variation)
+			auc = min(0.96, base_auc + leak_boost + variation)
 		else:
-			# Normal operation with gradual drift
-			accuracy = base_accuracy + time_factor + random.uniform(-0.02, 0.02)
-			precision = base_precision + time_factor + random.uniform(-0.03, 0.03)
-			recall = base_recall + time_factor + random.uniform(-0.02, 0.02)
-			auc = base_auc + time_factor + random.uniform(-0.03, 0.02)
+			# Low confidence when no leak (10-20% range)
+			accuracy = max(0.55, base_accuracy + variation)  # 55-70% = 10-20% confidence
+			precision = max(0.50, base_precision + variation)
+			recall = max(0.52, base_recall + variation)
+			auc = max(0.58, base_auc + variation)
 
 		return {
 			"accuracy": max(0.5, min(0.99, accuracy)),

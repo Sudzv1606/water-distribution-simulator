@@ -88,3 +88,70 @@ async def get_hydraulic_state():
 			"links": hyd.get_connectivity()[1]
 		}
 	}
+
+@router.get("/status")
+async def get_status():
+	"""Get current system status including sensor data and AI metrics"""
+	hyd = registry.get_hydraulic()
+	sim = registry.get_simulator()
+
+	# Get current pressures from hydraulic model
+	node_pressures = {}
+	if hyd and hyd.is_ready():
+		node_pressures = hyd.get_modified_pressures()
+
+	# Get active leaks
+	active_leaks = {}
+	if hyd:
+		active_leaks = hyd.get_active_leaks()
+
+	# Generate simulated sensor data based on current state
+	import random
+	import time
+
+	# Base values
+	base_spectral_freq = 50.0
+	base_rms_power = 5.0
+	base_kurtosis = 3.0
+	base_skewness = 0.0
+
+	# Modify values based on active leaks
+	total_leak_severity = sum(active_leaks.values())
+	if total_leak_severity > 0:
+		# Leaks cause higher frequency content and power
+		base_spectral_freq += total_leak_severity * 20
+		base_rms_power += total_leak_severity * 3
+		base_kurtosis += total_leak_severity * 2
+		base_skewness += total_leak_severity * 0.5
+
+	# Add some realistic noise
+	spectral_freq = base_spectral_freq + (random.random() - 0.5) * 5
+	rms_power = base_rms_power + (random.random() - 0.5) * 1
+	kurtosis = base_kurtosis + (random.random() - 0.5) * 0.5
+	skewness = base_skewness + (random.random() - 0.5) * 0.2
+
+	# Calculate AI model metrics based on leak severity
+	accuracy = max(0.7, min(0.99, 0.95 - total_leak_severity * 0.1))
+	precision = max(0.7, min(0.98, 0.94 - total_leak_severity * 0.08))
+	recall = max(0.7, min(0.97, 0.93 - total_leak_severity * 0.06))
+
+	# Calculate leak confidence based on anomaly score
+	anomaly_score = total_leak_severity * 100  # 0-100 scale
+	leak_confidence = min(100, anomaly_score * 1.2)  # Scale up slightly
+
+	return {
+		"spectral_freq": round(spectral_freq, 2),
+		"rms_power": round(rms_power, 3),
+		"kurtosis": round(kurtosis, 2),
+		"skewness": round(skewness, 2),
+		"accuracy": round(accuracy, 3),
+		"precision": round(precision, 3),
+		"recall": round(recall, 3),
+		"auc": round((accuracy + precision + recall) / 3, 3),
+		"f1_score": round(2 * (precision * recall) / (precision + recall), 3) if (precision + recall) > 0 else 0,
+		"node_pressures": node_pressures,
+		"active_leaks": active_leaks,
+		"leak_confidence": round(leak_confidence, 1),
+		"anomaly_score": round(anomaly_score, 2),
+		"timestamp": int(time.time())
+	}

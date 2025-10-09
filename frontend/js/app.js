@@ -21,6 +21,17 @@ let paused = false;
 
 let netCache = { nodes: [], links: [] };
 
+// 🌟 New UI Elements for Faulty Pipeline Status and Leak Resolution
+let currentLeakPipeline = null;
+let currentResolutionStatus = 'not_resolved';
+let assignedContractor = '';
+
+// 🌟 Simulation Mode Variables
+let selectedPipe = 'P1';
+let simLeaks = {};
+let simDemandMultiplier = 1.0;
+let simStartTime = Date.now();
+
 function appendLog(msg){ logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; }
 
 const spectralCtx = document.getElementById('spectralChart').getContext('2d');
@@ -642,12 +653,6 @@ pauseBtn.onclick = () => { paused = !paused; pauseBtn.textContent = paused ? 'Re
 const resetBtn = document.getElementById('resetBtn');
 resetBtn.onclick = resetCharts;
 
-// Simulation Mode Variables
-let selectedPipe = 'P1';
-let simLeaks = {};
-let simDemandMultiplier = 1.0;
-let simStartTime = Date.now();
-
 // Simulation Mode Functions
 function initSimulationMode() {
     console.log('🚀 APP.JS: initSimulationMode called - using new map-based system');
@@ -852,29 +857,41 @@ function setupSimulationEventListeners() {
 
 function injectSimulatedLeak() {
     const severity = parseFloat(document.getElementById('simLeakSev').value);
+    const pipeSelect = document.getElementById('simPipeSelect');
+    const pipeId = pipeSelect ? pipeSelect.value : 'P1';
+
+    currentLeakPipeline = pipeId;
     simLeaks[selectedPipe] = severity;
+
+    // Update UI elements immediately
+    updateFaultyPipelineStatus();
 
     // Send to backend
     fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipe_id: selectedPipe, severity: severity })
+        body: JSON.stringify({ pipe_id: pipeId, severity: severity })
     }).then(() => {
-        updateSimulationStatus(`Injected ${severity.toFixed(1)} severity leak in ${selectedPipe}`);
+        updateSimulationStatus(`💧 Injected ${severity.toFixed(1)} severity leak in ${pipeId}`);
         drawSimulationNetwork();
     }).catch(err => {
-        updateSimulationStatus(`Error injecting leak: ${err}`);
+        updateSimulationStatus(`❌ Error injecting leak: ${err}`);
     });
 }
 
 function clearAllLeaks() {
+    currentLeakPipeline = null;
     simLeaks = {};
+
+    // Update UI elements immediately
+    updateFaultyPipelineStatus();
+
     fetch(`${BASE_URL}/api/scenarios/leak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipe_id: 'NONE', severity: 0 })
     }).then(() => {
-        updateSimulationStatus('All leaks cleared');
+        updateSimulationStatus('🧹 All leaks cleared');
         drawSimulationNetwork();
     });
 }
@@ -1214,13 +1231,11 @@ function updateAIMetrics(data) {
         aiLeakConfidenceElement.style.width = `${confidence}%`;
         aiConfidenceTextElement.textContent = `${Math.round(confidence)}%`;
 
-        // Color coding for confidence levels
+        // Simple color coding: Green for low confidence (no leak), Red for high confidence (leak)
         if (confidence > 80) {
-            aiConfidenceTextElement.style.color = '#22c55e'; // Green
-        } else if (confidence > 60) {
-            aiConfidenceTextElement.style.color = '#f59e0b'; // Orange
+            aiConfidenceTextElement.style.color = '#ef4444'; // Red for high confidence (leak detected)
         } else {
-            aiConfidenceTextElement.style.color = '#ef4444'; // Red
+            aiConfidenceTextElement.style.color = '#22c55e'; // Green for low confidence (no leak)
         }
     }
 
@@ -1272,6 +1287,11 @@ function setupDirectLeakInjection() {
 
                 console.log('💧 DIRECT: Injecting leak in', pipeId, 'severity', severity);
 
+                // Update frontend variables FIRST
+                currentLeakPipeline = pipeId;
+                simLeaks[selectedPipe] = severity;
+                console.log('💧 DIRECT: Updated frontend variables:', { currentLeakPipeline, simLeaks });
+
                 // Force visual update immediately
                 forceLeakVisualUpdate(pipeId, severity);
 
@@ -1282,6 +1302,11 @@ function setupDirectLeakInjection() {
                     body: JSON.stringify({ pipe_id: pipeId, severity: severity })
                 }).then(response => {
                     console.log('🌐 DIRECT: Backend response:', response.status);
+
+                    // Update Faulty Pipeline Status UI after successful injection
+                    console.log('💧 DIRECT: Calling updateFaultyPipelineStatus()...');
+                    updateFaultyPipelineStatus();
+
                     updateSimulationStatus(`💧 Injected ${severity.toFixed(1)} severity leak in ${pipeId}`);
                 }).catch(error => {
                     console.error('❌ DIRECT: Backend error:', error);
@@ -1312,6 +1337,11 @@ function setupDirectLeakInjection() {
         clearBtn.onclick = function() {
             console.log('🧹 DIRECT: Clear leaks button clicked');
 
+            // Clear frontend variables FIRST
+            currentLeakPipeline = null;
+            simLeaks = {};
+            console.log('🧹 DIRECT: Cleared frontend variables');
+
             // Clear visual effects immediately
             if (typeof window !== 'undefined') {
                 if (window.activeScenarios) {
@@ -1341,6 +1371,11 @@ function setupDirectLeakInjection() {
                 headers: { 'Content-Type': 'application/json' }
             }).then(response => {
                 console.log('🌐 DIRECT: Clear response:', response.status);
+
+                // Update Faulty Pipeline Status UI after successful clearing
+                console.log('🧹 DIRECT: Calling updateFaultyPipelineStatus() after clear...');
+                updateFaultyPipelineStatus();
+
                 updateSimulationStatus('🧹 All leaks cleared');
             }).catch(error => {
                 console.error('❌ DIRECT: Error clearing leaks:', error);
@@ -1589,3 +1624,460 @@ function makeRobustAPICall(url, options = {}) {
 
 // Initialize simulation effects
 setInterval(updateSimulationEffects, 1000);
+
+// Initialize new UI elements
+function initNewUIElements() {
+    console.log('🔧 Initializing new UI elements...');
+
+    // Set up contractor dropdown
+    const contractorSelect = document.getElementById('contractorSelect');
+    if (contractorSelect) {
+        contractorSelect.addEventListener('change', (e) => {
+            assignedContractor = e.target.value;
+            updateContractorAssignment();
+        });
+        console.log('✅ Contractor dropdown initialized');
+    } else {
+        console.error('❌ Contractor dropdown not found');
+    }
+
+    // Set up assign contractor button
+    const assignBtn = document.getElementById('assignContractorBtn');
+    if (assignBtn) {
+        console.log('✅ Found assign button, attaching handler');
+        assignBtn.addEventListener('click', () => {
+            console.log('🎯 Assign button clicked!');
+            assignContractorTask();
+        });
+        console.log('✅ Assign button handler attached');
+    } else {
+        console.error('❌ Assign button not found');
+        console.log('🔍 Looking for button with ID "assignContractorBtn":', !!document.getElementById('assignContractorBtn'));
+    }
+
+    console.log('✅ New UI elements initialized');
+}
+
+// 🌟 IMMEDIATE ASSIGN BUTTON SETUP - Fix for popup not showing
+function setupAssignButtonImmediately() {
+    console.log('🚀 Setting up assign button immediately...');
+
+    const assignBtn = document.getElementById('assignContractorBtn');
+    if (assignBtn) {
+        console.log('✅ Assign button found, attaching immediate handler');
+
+        // Remove any existing handlers to avoid duplicates
+        assignBtn.onclick = null;
+
+        assignBtn.addEventListener('click', () => {
+            console.log('🎯 IMMEDIATE: Assign button clicked!');
+            assignContractorTask();
+        });
+
+        console.log('✅ Immediate assign button handler attached');
+        return true;
+    } else {
+        console.error('❌ Assign button not found for immediate setup');
+        return false;
+    }
+}
+
+// Update faulty pipeline status display
+function updateFaultyPipelineStatus() {
+    console.log('🔧 updateFaultyPipelineStatus called:', {
+        currentLeakPipeline,
+        currentMode: window.currentMode,
+        isSimulationView: document.getElementById('simulationView')?.style.display !== 'none'
+    });
+
+    const pipelineIdElement = document.getElementById('faultyPipelineId');
+    const confidenceElement = document.getElementById('faultyPipelineConfidence');
+    const confidenceTextElement = document.getElementById('faultyPipelineConfidenceText');
+
+    console.log('🔧 UI elements found:', {
+        pipelineIdElement: !!pipelineIdElement,
+        confidenceElement: !!confidenceElement,
+        confidenceTextElement: !!confidenceTextElement,
+        simulationViewVisible: document.getElementById('simulationView')?.style.display !== 'none'
+    });
+
+    if (currentLeakPipeline) {
+        console.log('🔧 Showing faulty pipeline:', currentLeakPipeline);
+        // Show faulty pipeline info
+        if (pipelineIdElement) {
+            pipelineIdElement.textContent = currentLeakPipeline;
+            console.log('✅ Updated pipeline ID to:', currentLeakPipeline);
+        } else {
+            console.error('❌ Pipeline ID element not found!');
+        }
+
+        if (confidenceElement && confidenceTextElement) {
+            // Get current leak confidence from AI metrics
+            const aiConfidenceText = document.getElementById('aiConfidenceText');
+            const confidence = aiConfidenceText ? parseInt(aiConfidenceText.textContent) || 0 : 0;
+
+            console.log('🔧 Current AI confidence:', confidence, 'from element:', aiConfidenceText);
+
+            confidenceElement.style.width = `${confidence}%`;
+            confidenceTextElement.textContent = `${confidence}%`;
+
+            // Color coding
+            if (confidence > 80) {
+                confidenceTextElement.style.color = '#ef4444'; // Red for high confidence
+                console.log('🔧 Set confidence color to RED');
+            } else {
+                confidenceTextElement.style.color = '#22c55e'; // Green for low confidence
+                console.log('🔧 Set confidence color to GREEN');
+            }
+        } else {
+            console.error('❌ Confidence elements not found!');
+        }
+    } else {
+        console.log('🔧 No active leak, showing None');
+        // No active leak
+        if (pipelineIdElement) {
+            pipelineIdElement.textContent = 'None';
+            console.log('✅ Updated pipeline ID to: None');
+        } else {
+            console.error('❌ Pipeline ID element not found for clearing!');
+        }
+        if (confidenceElement) confidenceElement.style.width = '0%';
+        if (confidenceTextElement) confidenceTextElement.textContent = '0%';
+    }
+
+    // Force visual refresh
+    if (pipelineIdElement) {
+        pipelineIdElement.style.display = 'block';
+        console.log('🔧 Forced visual refresh for pipeline element');
+    }
+}
+
+// Update resolution status display
+function updateResolutionStatus() {
+    const statusElement = document.getElementById('currentResolutionStatus');
+    const timeElement = document.getElementById('lastUpdatedTime');
+
+    if (statusElement) {
+        const statusText = {
+            'not_resolved': 'Not Resolved',
+            'in_progress': 'In Progress',
+            'resolved': 'Resolved'
+        };
+        statusElement.textContent = statusText[currentResolutionStatus] || 'Not Resolved';
+    }
+
+    if (timeElement) {
+        const now = new Date();
+        timeElement.textContent = now.toLocaleTimeString();
+    }
+}
+
+// Update contractor assignment
+function updateContractorAssignment() {
+    console.log('👷 Contractor assigned:', assignedContractor);
+    // Here you could send the contractor assignment to the backend
+    // For now, just log it
+}
+
+// Assign contractor task with popup notification
+function assignContractorTask() {
+    console.log('📋 Assigning contractor task...');
+
+    const contractorSelect = document.getElementById('contractorSelect');
+    const selectedContractor = contractorSelect ? contractorSelect.value : '';
+
+    if (!selectedContractor) {
+        alert('⚠️ Please select a contractor first!');
+        return;
+    }
+
+    const contractorNames = {
+        'contractor1': 'AquaFix Solutions',
+        'contractor2': 'PipeMaster Pro',
+        'contractor3': 'HydroTech Services',
+        'contractor4': 'FlowGuard Engineers',
+        'contractor5': 'WaterWorks Specialists'
+    };
+
+    const contractorName = contractorNames[selectedContractor] || 'Unknown Contractor';
+
+    // Show popup notification
+    showAssignmentPopup(contractorName);
+
+    console.log('✅ Task assigned to:', contractorName);
+}
+
+// Show assignment popup
+function showAssignmentPopup(contractorName) {
+    console.log('📋 Showing assignment popup for:', contractorName);
+
+    // Create popup element if it doesn't exist
+    let popup = document.getElementById('assignmentPopup');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'assignmentPopup';
+        popup.className = 'assignment-popup';
+        popup.innerHTML = `
+            <div class="popup-content">
+                <div class="popup-header">
+                    <h3>📋 Task Assignment</h3>
+                    <button class="popup-close" onclick="closeAssignmentPopup()">×</button>
+                </div>
+                <div class="popup-body">
+                    <p id="popupMessage">Task has been successfully assigned!</p>
+                    <div class="popup-details">
+                        <p><strong>Contractor:</strong> <span id="popupContractor">--</span></p>
+                        <p><strong>Pipeline:</strong> <span id="popupPipeline">--</span></p>
+                        <p><strong>Status:</strong> <span class="status-sent">Detailed Send</span></p>
+                    </div>
+                </div>
+                <div class="popup-footer">
+                    <button class="btn btn-primary" onclick="closeAssignmentPopup()">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(popup);
+
+        // Add CSS styles for the popup
+        const style = document.createElement('style');
+        style.textContent = `
+            .assignment-popup {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+                animation: fadeIn 0.3s ease-in-out;
+            }
+
+            .popup-content {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+                width: 90%;
+                max-width: 400px;
+                animation: slideIn 0.3s ease-in-out;
+            }
+
+            .popup-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px 20px 0 20px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .popup-header h3 {
+                margin: 0;
+                color: #1f2937;
+                font-size: 18px;
+            }
+
+            .popup-close {
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #6b7280;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background-color 0.2s;
+            }
+
+            .popup-close:hover {
+                background-color: #f3f4f6;
+            }
+
+            .popup-body {
+                padding: 20px;
+            }
+
+            .popup-body p {
+                margin: 0 0 15px 0;
+                color: #374151;
+                font-size: 16px;
+            }
+
+            .popup-details {
+                background: #f8fafc;
+                border-radius: 8px;
+                padding: 15px;
+                margin: 15px 0;
+            }
+
+            .popup-details p {
+                margin: 8px 0;
+                font-size: 14px;
+            }
+
+            .status-sent {
+                color: #059669;
+                font-weight: 600;
+            }
+
+            .popup-footer {
+                padding: 0 20px 20px 20px;
+                text-align: center;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px) scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Update popup content
+    document.getElementById('popupMessage').textContent = 'Task has been successfully assigned!';
+    document.getElementById('popupContractor').textContent = contractorName;
+    document.getElementById('popupPipeline').textContent = currentLeakPipeline || 'N/A';
+
+    // Show popup
+    popup.style.display = 'flex';
+
+    console.log('✅ Assignment popup displayed');
+}
+
+// Close assignment popup
+function closeAssignmentPopup() {
+    const popup = document.getElementById('assignmentPopup');
+    if (popup) {
+        popup.style.display = 'none';
+        console.log('📋 Assignment popup closed');
+    }
+}
+
+// Enhanced leak injection with UI updates
+function injectSimulatedLeak() {
+    console.log('🚰 injectSimulatedLeak called');
+
+    const severityInput = document.getElementById('simLeakSev');
+    const pipeSelect = document.getElementById('simPipeSelect');
+
+    console.log('🔍 DEBUG: Elements found:', {
+        severityInput: !!severityInput,
+        pipeSelect: !!pipeSelect,
+        severityValue: severityInput ? severityInput.value : 'N/A',
+        pipeValue: pipeSelect ? pipeSelect.value : 'N/A'
+    });
+
+    if (!severityInput || !pipeSelect) {
+        console.error('❌ DEBUG: Required elements not found!');
+        updateSimulationStatus('❌ Error: Form elements not found');
+        return;
+    }
+
+    const severity = parseFloat(severityInput.value);
+    const pipeId = pipeSelect.value;
+
+    console.log('🚰 Injecting leak:', { pipeId, severity, selectedPipe });
+
+    // Update variables
+    currentLeakPipeline = pipeId;
+    simLeaks[selectedPipe] = severity;
+
+    // Update Faulty Pipeline Status UI immediately
+    console.log('🚰 Updating Faulty Pipeline Status UI...');
+    updateFaultyPipelineStatus();
+
+    // Send to backend
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipe_id: pipeId, severity: severity })
+    }).then(response => {
+        console.log('🚰 Backend API call successful:', response.status);
+        updateSimulationStatus(`💧 Injected ${severity.toFixed(1)} severity leak in ${pipeId}`);
+        drawSimulationNetwork();
+    }).catch(err => {
+        console.error('🚰 Backend API call failed:', err);
+        updateSimulationStatus(`❌ Error injecting leak: ${err}`);
+    });
+}
+
+// Enhanced clear leaks with UI updates
+function clearAllLeaks() {
+    currentLeakPipeline = null;
+    simLeaks = {};
+
+    // Update UI elements
+    updateFaultyPipelineStatus();
+
+    fetch(`${BASE_URL}/api/scenarios/leak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipe_id: 'NONE', severity: 0 })
+    }).then(() => {
+        updateSimulationStatus('🧹 All leaks cleared');
+        drawSimulationNetwork();
+    });
+}
+
+// Initialize new UI elements when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM Content Loaded - Setting up assign button immediately');
+
+    // Set up assign button immediately to fix popup issue
+    setupAssignButtonImmediately();
+
+    setTimeout(() => {
+        initNewUIElements();
+        updateFaultyPipelineStatus();
+        updateResolutionStatus();
+
+        // Add debugging for button clicks
+        const injectBtn = document.getElementById('simLeakBtn');
+        const clearBtn = document.getElementById('simClearLeakBtn');
+
+        if (injectBtn) {
+            console.log('🔍 DEBUG: Found inject button, current onclick:', typeof injectBtn.onclick);
+            injectBtn.addEventListener('click', () => {
+                console.log('🎯 Button clicked! About to call injectSimulatedLeak...');
+            });
+        } else {
+            console.error('❌ DEBUG: Inject button NOT found!');
+        }
+
+        if (clearBtn) {
+            console.log('🔍 DEBUG: Found clear button, current onclick:', typeof clearBtn.onclick);
+        } else {
+            console.error('❌ DEBUG: Clear button NOT found!');
+        }
+
+        // Check if UI elements exist
+        setTimeout(() => {
+            const elements = {
+                faultyPipelineId: !!document.getElementById('faultyPipelineId'),
+                faultyPipelineConfidence: !!document.getElementById('faultyPipelineConfidence'),
+                faultyPipelineConfidenceText: !!document.getElementById('faultyPipelineConfidenceText'),
+                resolutionStatus: !!document.getElementById('resolutionStatus'),
+                contractorSelect: !!document.getElementById('contractorSelect'),
+                assignContractorBtn: !!document.getElementById('assignContractorBtn')
+            };
+            console.log('🔍 DEBUG: UI Elements check:', elements);
+        }, 2000);
+
+    }, 1000);
+});

@@ -83,9 +83,12 @@ class HydraulicModel:
 	def apply_leak(self, pipe_id: str, severity: float) -> None:
 		"""Apply leak effect to hydraulic model with realistic pressure propagation"""
 		print(f"🔧 HYDRAULIC: Applying leak to pipe {pipe_id} with severity {severity}")
+		print(f"🔍 HYDRAULIC: Current active leaks before: {self._active_leaks}")
+		print(f"🔍 HYDRAULIC: Available pipes: {[link[0] for link in self._links]}")
 
 		# Store the leak
 		self._active_leaks[pipe_id] = severity
+		print(f"✅ HYDRAULIC: Stored leak {pipe_id} -> {severity}")
 
 		# Build connectivity graph if not already built
 		if not self._connectivity_graph:
@@ -100,6 +103,7 @@ class HydraulicModel:
 
 		if not pipe_endpoints:
 			print(f"❌ HYDRAULIC: Pipe {pipe_id} not found in network")
+			print(f"🔍 HYDRAULIC: Available links: {self._links}")
 			return
 
 		print(f"✅ HYDRAULIC: Found pipe endpoints: {pipe_endpoints}")
@@ -111,6 +115,7 @@ class HydraulicModel:
 		self._calculate_flow_changes()
 
 		print(f"✅ HYDRAULIC: Leak applied successfully. Modified pressures: {self._modified_pressures}")
+		print(f"🔍 HYDRAULIC: Active leaks after: {self._active_leaks}")
 
 	def _build_connectivity_graph(self) -> None:
 		"""Build undirected graph for connectivity analysis"""
@@ -216,6 +221,7 @@ class HydraulicModel:
 	def clear_leaks(self) -> None:
 		"""Clear all active leaks and reset to baseline pressures"""
 		print("🧹 HYDRAULIC: Clearing all leaks")
+		print(f"🔍 HYDRAULIC: Active leaks before clear: {self._active_leaks}")
 
 		self._active_leaks.clear()
 		self._modified_pressures = self._baseline_pressure.copy()
@@ -223,6 +229,7 @@ class HydraulicModel:
 		# Reset flows to baseline
 		# Note: In a real implementation, you might want to store original flows separately
 		print("✅ HYDRAULIC: All leaks cleared, pressures reset to baseline")
+		print(f"🔍 HYDRAULIC: Active leaks after clear: {self._active_leaks}")
 
 	def get_modified_pressures(self) -> Dict[str, float]:
 		"""Get current modified pressures (including leak effects)"""

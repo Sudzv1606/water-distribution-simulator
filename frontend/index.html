@@ -278,6 +278,43 @@
 								</div>
 							</div>
 
+							<!-- 🏭 Faulty Pipeline Status Card -->
+							<div class="control-card">
+								<h3>🏭 Faulty Pipeline Status</h3>
+								<div class="control-group">
+									<label>Pipeline ID:</label>
+									<div class="pipeline-display" id="faultyPipelineId">--</div>
+								</div>
+								<div class="control-group">
+									<label>Leak Confidence:</label>
+									<div class="confidence-display">
+										<div class="confidence-bar-small">
+											<div class="confidence-fill-small" id="faultyPipelineConfidence" style="width: 0%"></div>
+										</div>
+										<span class="confidence-text" id="faultyPipelineConfidenceText">0%</span>
+									</div>
+								</div>
+							</div>
+
+							<!-- 👷 Contractor Assignment Card -->
+							<div class="control-card">
+								<h3>👷 Contractor Assignment</h3>
+								<div class="control-group">
+									<label>Assign Contractor:</label>
+									<select id="contractorSelect" class="contractor-selector">
+										<option value="">Select Contractor...</option>
+										<option value="contractor1">AquaFix Solutions</option>
+										<option value="contractor2">PipeMaster Pro</option>
+										<option value="contractor3">HydroTech Services</option>
+										<option value="contractor4">FlowGuard Engineers</option>
+										<option value="contractor5">WaterWorks Specialists</option>
+									</select>
+								</div>
+								<div class="control-group">
+									<button id="assignContractorBtn" class="btn btn-primary">📋 Assign Task</button>
+								</div>
+							</div>
+
 
 						</div>
 					</div>
