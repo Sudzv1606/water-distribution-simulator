@@ -1,0 +1,796 @@
+/* 🌟 EPANET-Style Network Visualization Styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* 🎯 EPANET Container Layout */
+.epanet-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    background: linear-gradient(135deg, #0a0e1a 0%, #1e293b 100%);
+    display: flex;
+    overflow: hidden;
+}
+
+/* 🏭 Network Visualization Area */
+.network-visualization {
+    position: relative;
+    flex: 1;
+    background: rgba(15, 23, 42, 0.9);
+    margin: 20px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+#epanetCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, #1e293b 0%, #0a0e1a 100%);
+    cursor: crosshair; /* Make it clear the map is interactive */
+    z-index: 1; /* Ensure map is above background but below UI elements */
+}
+
+/* 🎛️ Control Panel Layout */
+.map-controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 380px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    z-index: 1000;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.control-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.control-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.control-section h3 {
+    color: #f1f5f9;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.control-row:last-child {
+    margin-bottom: 0;
+}
+
+.control-row label {
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 120px;
+}
+
+/* 🎛️ Interactive Controls */
+.control-row input[type="range"] {
+    flex: 1;
+    height: 6px;
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+    transition: all 0.2s ease;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+}
+
+.control-row input[type="number"],
+.control-row select {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #f1f5f9;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    min-width: 80px;
+}
+
+.control-row input[type="number"]:focus,
+.control-row select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* 🎨 Buttons */
+.btn {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.btn-danger:hover {
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #64748b, #475569);
+}
+
+.btn-secondary:hover {
+    box-shadow: 0 4px 12px rgba(100, 116, 139, 0.4);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.btn-warning:hover {
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+/* 📊 Live Metrics Display */
+.live-metrics {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.metric-item {
+    background: rgba(30, 41, 59, 0.6);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.metric-label {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    color: #f1f5f9;
+    font-size: 18px;
+    font-weight: 700;
+    display: block;
+}
+
+.metric-trend {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.metric-trend.up {
+    color: #22c55e;
+}
+
+.metric-trend.down {
+    color: #ef4444;
+}
+
+.metric-trend.neutral {
+    color: #64748b;
+}
+
+/* 🗺️ Map Legend */
+.map-legend {
+    position: absolute;
+    bottom: 30px;
+    left: 20px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 1000;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.legend-item:last-child {
+    margin-bottom: 0;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.legend-dot.normal {
+    background: #64748b;
+}
+
+.legend-dot.leaking {
+    background: #ef4444;
+    animation: pulse 2s infinite;
+}
+
+.legend-dot.high-pressure {
+    background: #f59e0b;
+}
+
+.legend-line {
+    width: 20px;
+    height: 3px;
+    background: #64748b;
+    border-radius: 2px;
+}
+
+/* 🎯 Node Popups */
+.node-popup {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    color: #f1f5f9;
+    min-width: 200px;
+}
+
+.popup-header {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #3b82f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.popup-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.popup-metric {
+    background: rgba(30, 41, 59, 0.6);
+    padding: 8px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.popup-metric-label {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.popup-metric-value {
+    color: #f1f5f9;
+    font-size: 14px;
+    font-weight: 700;
+    display: block;
+}
+
+/* 🌊 Flow Animation */
+.flow-arrow {
+    position: absolute;
+    color: #22c55e;
+    font-size: 16px;
+    animation: flow 1.5s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+@keyframes flow {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* 🎨 Animations */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+}
+
+/* 📱 Responsive Design */
+@media (max-width: 768px) {
+    .map-controls {
+        position: static;
+        width: 100%;
+        margin: 20px 0;
+    }
+
+    .control-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .control-row label {
+        min-width: auto;
+    }
+
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 🎯 Status Indicators */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.status-indicator.active {
+    background: #22c55e;
+    animation: pulse 2s infinite;
+}
+
+.status-text {
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* 🎨 Enhanced Scrollbar */
+.map-controls::-webkit-scrollbar {
+    width: 6px;
+}
+
+.map-controls::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 3px;
+}
+
+.map-controls::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 3px;
+}
+
+.map-controls::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.7);
+}
+
+/* 🎛️ EPANET-Style Enhanced Controls */
+.epanet-controls {
+    width: 420px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 20px;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* 🎯 Network Status Overlay */
+.network-status {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 1000;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.status-item:last-child {
+    margin-bottom: 0;
+}
+
+.status-label {
+    font-weight: 500;
+}
+
+.status-value {
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+/* 📊 Enhanced Metric Display */
+.metric-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(59, 130, 246, 0.2);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.metric-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* 🎯 Confidence Meter */
+.confidence-meter {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.confidence-label {
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.confidence-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(239, 68, 68, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.confidence-value {
+    color: #f1f5f9;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: right;
+    display: block;
+}
+
+/* 📋 Last Detection Info */
+.last-detection {
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(34, 197, 94, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.detection-label {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.detection-value {
+    color: #22c55e;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* 🎛️ Scenario Grid Layout */
+.scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.scenario-item {
+    background: rgba(30, 41, 59, 0.6);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.scenario-item label {
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.quick-input {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #f1f5f9;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    width: 60px;
+    margin-right: 4px;
+}
+
+.quick-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* 🎛️ Enhanced Selectors */
+.pipe-selector,
+.material-selector,
+.zone-selector {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #f1f5f9;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    min-width: 180px;
+}
+
+.pipe-selector:focus,
+.material-selector:focus,
+.zone-selector:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* 🎛️ Severity Slider Enhancement */
+.severity-slider {
+    background: linear-gradient(to right, #22c55e 0%, #f59e0b 50%, #ef4444 100%);
+    border-radius: 3px;
+}
+
+.severity-slider::-webkit-slider-thumb {
+    background: #f1f5f9;
+    border: 2px solid #3b82f6;
+}
+
+.severity-value {
+    color: #f1f5f9;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 35px;
+    text-align: center;
+}
+
+/* 🎯 Status Grid Layout */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.status-grid .status-item {
+    background: rgba(30, 41, 59, 0.6);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* 🎛️ Timeline Controls */
+.timeline-control {
+    margin-bottom: 16px;
+}
+
+.timeline-control label {
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.timeline-slider {
+    width: 100%;
+    height: 6px;
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+    margin-bottom: 8px;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #f1f5f9;
+}
+
+.timeline-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 32px;
+}
+
+/* 📱 Status Message */
+.status-message {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    color: #22c55e;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* 🎨 EPANET Node Types */
+.node-source {
+    fill: #ff6b35 !important;
+}
+
+.node-reservoir {
+    fill: #4ecdc4 !important;
+}
+
+.node-tank {
+    fill: #45b7d1 !important;
+}
+
+.node-junction {
+    fill: #96ceb4 !important;
+}
+
+/* 🌊 EPANET Pipe States */
+.pipe-normal {
+    stroke: #96ceb4 !important;
+    stroke-width: 3;
+}
+
+.pipe-leaking {
+    stroke: #ff6b35 !important;
+    stroke-width: 5;
+    animation: leakPulse 2s infinite;
+}
+
+.pipe-high-pressure {
+    stroke: #ffd93d !important;
+    stroke-width: 4;
+}
+
+/* 🎨 EPANET Animations */
+@keyframes leakPulse {
+    0%, 100% {
+        opacity: 1;
+        stroke-width: 5;
+    }
+    50% {
+        opacity: 0.7;
+        stroke-width: 7;
+    }
+}
+
+/* 📱 Enhanced Responsive Design */
+@media (max-width: 1200px) {
+    .epanet-container {
+        flex-direction: column;
+    }
+
+    .network-visualization {
+        height: 60vh;
+        margin: 10px;
+    }
+
+    .epanet-controls {
+        width: calc(100% - 20px);
+        height: 35vh;
+        margin: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .scenario-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-buttons {
+        flex-wrap: wrap;
+    }
+}

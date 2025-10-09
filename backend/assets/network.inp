@@ -1,0 +1,51 @@
+[TITLE]
+Chennai Water Distribution Network - EPANET Model
+Smart Water Digital Twin Hydraulic Model
+
+[OPTIONS]
+ UNITS              LPS
+ HEADLOSS           H-W
+ QUALITY            NONE
+ PATTERN            1
+
+[JUNCTIONS]
+;ID               Elevation      Demand        Pattern
+ J1                45             15            1
+ J2                42             12            1
+ J3                48             18            1
+ J4                46             10            1
+ J5                44             14            1
+ J6                41             8             1
+ J7                43             16            1
+
+[RESERVOIRS]
+;ID               Head           Pattern
+ LAKE              65
+ RIV               62
+
+[TANKS]
+;ID               Elevation      InitialLevel  MinimumLevel MaximumLevel Diameter  Overflow
+ TANK_1            50             5.0           0.5          10.0         25        0
+ TANK_2            48             4.5           0.5          8.0          22        0
+ TANK_3            46             4.0           0.5          7.0          20        0
+
+[PIPES]
+;ID               Node1          Node2          Length    Diameter   Roughness  MinorLoss  Status
+ P1                LAKE           J1             1200      400        100        0          Open
+ P2                J1             TANK_1         800       350        100        0          Open
+ P3                TANK_1         J3             600       300        110        0          Open
+ P4                J3             J4             500       250        110        0          Open
+ P5                RIV            J2             900       380        100        0          Open
+ P6                J2             TANK_2         700       320        110        0          Open
+ P7                TANK_2         J5             550       280        120        0          Open
+ P8                J5             J6             400       220        120        0          Open
+ P9                RIV            TANK_3         650       300        110        0          Open
+ P10               TANK_3         J6             480       260        120        0          Open
+ P11               J6             J7             350       200        120        0          Open
+ P12               J2             J7             420       240        110        0          Open
+
+[PATTERNS]
+;ID               Multipliers
+ 1                1.0
+
+[END]

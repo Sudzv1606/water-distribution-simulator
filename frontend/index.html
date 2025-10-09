@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Smart Water Digital Twin</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+	<!-- Map and Chart Libraries -->
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+	<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+	<link rel="stylesheet" href="css/styles.css" />
+	<link rel="stylesheet" href="css/map.css" />
+	<script>
+		// Debug script to run immediately
+		console.log('🚀 Page loading, checking elements...');
+
+		// Check if elements exist right away
+		function checkElements() {
+			const modeToggle = document.getElementById('modeToggle');
+			const monitoringView = document.getElementById('monitoringView');
+			const simulationView = document.getElementById('simulationView');
+
+			console.log('🔍 Element check:', {
+				modeToggle: !!modeToggle,
+				monitoringView: !!monitoringView,
+				simulationView: !!simulationView,
+				modeToggleText: modeToggle ? modeToggle.textContent : 'N/A',
+				monitoringDisplay: monitoringView ? monitoringView.style.display : 'N/A',
+				simulationDisplay: simulationView ? simulationView.style.display : 'N/A'
+			});
+
+			return { modeToggle, monitoringView, simulationView };
+		}
+
+		// Check immediately
+		checkElements();
+
+		// Check again when DOM is ready
+		document.addEventListener('DOMContentLoaded', () => {
+			console.log('📋 DOM Content Loaded');
+			checkElements();
+		});
+
+		// Check when everything is loaded
+		window.addEventListener('load', () => {
+			console.log('⚡ Window fully loaded');
+			const elements = checkElements();
+
+			// Set up APP.JS handler override after page loads
+			if (elements.modeToggle && elements.monitoringView && elements.simulationView) {
+				console.log('✅ All elements found, APP.JS should handle the toggle');
+
+				// Confirm APP.JS handler is working
+				console.log('🧪 Current mode:', window.currentMode || 'not set');
+				console.log('🧪 Mode toggle onclick:', typeof elements.modeToggle.onclick);
+
+				// Test if APP.JS handler exists
+				if (typeof elements.modeToggle.onclick === 'function') {
+					console.log('✅ APP.JS handler is properly attached');
+				} else {
+					console.log('❌ APP.JS handler not attached');
+				}
+			} else {
+				console.error('❌ Some elements still missing after page load');
+			}
+		});
+	</script>
+</head>
+<body>
+	<div class="container">
+		<header class="app-header">
+			<div class="brand">Chennai Water Distribution Network (EPANET)</div>
+			<div class="header-controls">
+				<button id="modeToggle" class="btn mode-toggle">Switch to Simulation Mode</button>
+				<div class="status pill" id="status">Disconnected</div>
+			</div>
+		</header>
+
+		<!-- Monitoring View (Default) - Clean dashboard focus -->
+		<div id="monitoringView">
+			<section class="kpis">
+				<div class="kpi">
+					<div class="kpi-label">Spectral Frequency (S1)</div>
+					<div class="kpi-value" id="kpiSpectral">--</div>
+				</div>
+				<div class="kpi">
+					<div class="kpi-label">RMS Power</div>
+					<div class="kpi-value" id="kpiRMS">--</div>
+				</div>
+			</section>
+
+			<section class="grid">
+				<div class="panel shadow">
+					<h3>Spectral Frequency</h3>
+					<canvas id="spectralChart" height="140"></canvas>
+				</div>
+				<div class="panel shadow">
+					<h3>Kurtosis & Skewness</h3>
+					<canvas id="statsChart" height="140"></canvas>
+				</div>
+				<div class="panel shadow">
+					<h3>RMS Power</h3>
+					<canvas id="rmsChart" height="140"></canvas>
+				</div>
+				<div class="panel shadow">
+					<h3>Model Performance</h3>
+					<div class="model-scores">
+						<div class="score-item">
+							<span class="score-label">Accuracy:</span>
+							<span class="score-value" id="accScore">--</span>
+						</div>
+						<div class="score-item">
+							<span class="score-label">Precision:</span>
+							<span class="score-value" id="precScore">--</span>
+						</div>
+						<div class="score-item">
+							<span class="score-label">Recall:</span>
+							<span class="score-value" id="recScore">--</span>
+						</div>
+						<div class="score-item">
+							<span class="score-label">AUC:</span>
+							<span class="score-value" id="aucScore">--</span>
+						</div>
+					</div>
+				</div>
+				<div class="panel shadow">
+					<h3>Network</h3>
+					<div class="legend">
+						<span class="dot"></span> Node
+						<span class="line"></span> Link
+					</div>
+					<div id="networkCanvasWrap">
+						<canvas id="networkCanvas" height="260"></canvas>
+					</div>
+				</div>
+				<div class="panel shadow">
+					<h3>Recent Anomalies</h3>
+					<table class="table" id="anomTable">
+						<thead>
+							<tr><th>Time</th><th>Score</th><th>Location</th></tr>
+						</thead>
+						<tbody></tbody>
+					</table>
+				</div>
+			</section>
+
+			<div id="alert" class="alert"></div>
+			<pre id="log" class="log"></pre>
+		</div>
+
+		<!-- 🌟 EPANET-Style Network Visualization - Full Map + Bottom Panel Layout -->
+		<div id="simulationView" style="display: none;">
+			<!-- 🏭 Full-Screen Map Container -->
+			<div class="map-container">
+				<canvas id="epanetCanvas" width="1200" height="800"></canvas>
+
+				<!-- 🎯 Floating UI Elements -->
+				<div class="floating-controls">
+					<div class="search-box">
+						<input type="text" placeholder="Search nodes/pipes..." class="search-input">
+					</div>
+					<div class="status-chip">
+						<span class="status-indicator"></span>
+						<span class="status-text">Live</span>
+					</div>
+				</div>
+
+				<!-- 💬 Pipe Information Tooltip -->
+				<div id="pipeTooltip" class="pipe-tooltip">
+					<div class="tooltip-header">
+						<div class="tooltip-title">
+							<span class="tooltip-icon">🚰</span>
+							<span class="tooltip-pipe-id">PIPE: --</span>
+						</div>
+						<div class="tooltip-subtitle" id="tooltipPipeName">Pipe Name</div>
+						<button class="tooltip-close-btn" onclick="hidePipeTooltip()" title="Close">×</button>
+					</div>
+
+					<div class="tooltip-section">
+						<div class="section-header">
+							<span class="section-icon">🌊</span>
+							<span class="section-title">HYDRAULIC DATA</span>
+						</div>
+						<div class="section-content">
+							<div class="data-row">
+								<span class="data-label">Length:</span>
+								<span class="data-value" id="tooltipLength">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Diameter:</span>
+								<span class="data-value" id="tooltipDiameter">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Material:</span>
+								<span class="data-value" id="tooltipMaterial">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Flow:</span>
+								<span class="data-value" id="tooltipFlow">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Velocity:</span>
+								<span class="data-value" id="tooltipVelocity">--</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="tooltip-section">
+						<div class="section-header">
+							<span class="section-icon">🔊</span>
+							<span class="section-title">ACOUSTIC / DSP</span>
+						</div>
+						<div class="section-content">
+							<div class="data-row">
+								<span class="data-label">Spectral Freq:</span>
+								<span class="data-value" id="tooltipSpectral">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">RMS Power:</span>
+								<span class="data-value" id="tooltipRMS">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Signal Quality:</span>
+								<span class="data-value" id="tooltipSignalQuality">--</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="tooltip-section">
+						<div class="section-header">
+							<span class="section-icon">🤖</span>
+							<span class="section-title">AI MODEL STATUS</span>
+						</div>
+						<div class="section-content">
+							<div class="data-row">
+								<span class="data-label">Leak Probability:</span>
+								<span class="data-value" id="tooltipLeakProb">--</span>
+							</div>
+							<div class="data-row">
+								<span class="data-label">Anomaly Score:</span>
+								<span class="data-value" id="tooltipAnomaly">--</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- 🎛️ Bottom Sliding Panel -->
+			<div class="bottom-panel">
+				<div class="panel-header">
+					<div class="panel-tabs">
+						<button class="tab active">Scenario Controls</button>
+						<button class="tab">Hydraulic Data</button>
+						<button class="tab">Acoustic Data</button>
+						<button class="tab">AI Metrics</button>
+					</div>
+					<button class="panel-toggle-btn" id="panelToggleBtn" title="Toggle Panel">
+						<span class="toggle-icon">⏵</span>
+					</button>
+				</div>
+
+				<div class="panel-content">
+					<!-- Scenario Controls Tab -->
+					<div class="tab-content active" id="scenarioTab">
+						<div class="controls-grid">
+							<!-- 🚰 Enhanced Leak Simulation Section -->
+							<div class="control-card">
+								<h3>🚰 Leak Simulation</h3>
+								<div class="control-group">
+									<label>Pipe Selector:</label>
+									<select id="simPipeSelect" class="pipe-selector">
+										<option value="P1">P1 - Main Supply Line</option>
+										<option value="P2">P2 - Distribution Branch</option>
+										<option value="P3">P3 - Service Connection</option>
+										<option value="P4">P4 - Secondary Line</option>
+										<option value="P5">P5 - Transfer Line</option>
+									</select>
+								</div>
+								<div class="control-group">
+									<label>Leak Severity:</label>
+									<div class="slider-container">
+										<input id="simLeakSev" type="range" min="0" max="1" step="0.1" value="0.5" class="severity-slider" />
+										<span id="simLeakValue" class="slider-value">0.5</span>
+									</div>
+								</div>
+								<div class="control-group">
+									<label>Material Type:</label>
+									<select id="pipeMaterial" class="material-selector">
+										<option value="DI">Ductile Iron</option>
+										<option value="PVC">PVC</option>
+										<option value="PE">Polyethylene</option>
+										<option value="CI">Cast Iron</option>
+									</select>
+								</div>
+								<div class="control-group">
+									<button id="simLeakBtn" class="btn btn-danger">💧 Inject Leak</button>
+									<button id="simClearLeakBtn" class="btn btn-secondary">🧹 Clear All</button>
+								</div>
+							</div>
+
+							<!-- ⚡ Demand Management Section -->
+							<div class="control-card">
+								<h3>⚡ Demand Management</h3>
+								<div class="control-group">
+									<label>Zone Selector:</label>
+									<select id="demandZone" class="zone-selector">
+										<option value="ZONE_1">District A (Teynampet)</option>
+										<option value="ZONE_2">District B (Kilpauk)</option>
+										<option value="ZONE_3">District C (Saidapet)</option>
+									</select>
+								</div>
+								<div class="control-group">
+									<label>Demand Multiplier:</label>
+									<div class="slider-container">
+										<input id="simDemandMul" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
+										<span id="simDemandValue">1.0x</span>
+									</div>
+								</div>
+								<div class="control-group">
+									<label>Duration (sec):</label>
+									<input id="simDemandDur" type="number" min="10" max="300" value="60" />
+								</div>
+								<div class="control-group">
+									<button id="simDemandBtn" class="btn btn-warning">⚡ Apply Demand Spike</button>
+								</div>
+							</div>
+
+							<!-- 🎛️ Quick Scenarios -->
+							<div class="control-card">
+								<h3>🎛️ Quick Scenarios</h3>
+								<div class="quick-scenarios">
+									<div class="quick-scenario">
+										<label>Quick Leak:</label>
+										<input id="quickLeakPipe" placeholder="P1" class="quick-input" />
+										<input id="quickLeakSev" type="number" min="0" max="1" step="0.1" value="0.5" placeholder="0.5" class="quick-input" />
+										<button id="quickLeakBtn" class="btn btn-small">🚰 Inject</button>
+									</div>
+									<div class="quick-scenario">
+										<label>Demand Spike:</label>
+										<input id="quickDemandMul" type="number" step="0.1" value="1.2" placeholder="1.2" class="quick-input" />
+										<input id="quickDemandDur" type="number" value="120" placeholder="120" class="quick-input" />
+										<button id="quickDemandBtn" class="btn btn-small">⚡ Spike</button>
+									</div>
+								</div>
+								<div class="control-group">
+									<button id="simPauseBtn" class="btn">⏸️ Pause Simulation</button>
+									<button id="simResetBtn" class="btn btn-secondary">🔄 Reset Network</button>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Hydraulic Data Tab -->
+					<div class="tab-content" id="hydraulicTab">
+						<div class="data-grid">
+							<div class="metric-card">
+								<h4>📊 Real-time Pressure Gauges</h4>
+								<div class="metric-grid">
+									<div class="metric-item">
+										<span class="metric-label">Node P1</span>
+										<span class="metric-value" id="hydP1">-- psi</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Node P2</span>
+										<span class="metric-value" id="hydP2">-- psi</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Node P3</span>
+										<span class="metric-value" id="hydP3">-- psi</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Node P4</span>
+										<span class="metric-value" id="hydP4">-- psi</span>
+									</div>
+								</div>
+							</div>
+							<div class="metric-card">
+								<h4>🌊 Flow Rate Monitoring</h4>
+								<div class="metric-grid">
+									<div class="metric-item">
+										<span class="metric-label">Pipe F1</span>
+										<span class="metric-value" id="hydF1">-- L/s</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Pipe F2</span>
+										<span class="metric-value" id="hydF2">-- L/s</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Pipe F3</span>
+										<span class="metric-value" id="hydF3">-- L/s</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Pipe F4</span>
+										<span class="metric-value" id="hydF4">-- L/s</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Acoustic Data Tab -->
+					<div class="tab-content" id="acousticTab">
+						<div class="data-grid">
+							<div class="metric-card">
+								<h4>🔊 Spectral Analysis</h4>
+								<div class="metric-grid">
+									<div class="metric-item">
+										<span class="metric-label">Dominant Freq</span>
+										<span class="metric-value" id="specFreq">-- Hz</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Frequency Range</span>
+										<span class="metric-value" id="freqRange">-- Hz</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Peak Amplitude</span>
+										<span class="metric-value" id="peakAmp">-- dB</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Harmonic Distortion</span>
+										<span class="metric-value" id="harmonicDist">--%</span>
+									</div>
+								</div>
+							</div>
+							<div class="metric-card">
+								<h4>📊 Signal Quality</h4>
+								<div class="metric-grid">
+									<div class="metric-item">
+										<span class="metric-label">SNR</span>
+										<span class="metric-value" id="snr">-- dB</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">THD</span>
+										<span class="metric-value" id="thd">--%</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Crest Factor</span>
+										<span class="metric-value" id="crestFactor">--</span>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Dynamic Range</span>
+										<span class="metric-value" id="dynamicRange">-- dB</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- AI Metrics Tab -->
+					<div class="tab-content" id="aiTab">
+						<div class="data-grid">
+							<div class="metric-card">
+								<h4>🤖 Model Performance</h4>
+								<div class="metric-grid">
+									<div class="metric-item">
+										<span class="metric-label">Accuracy</span>
+										<span class="metric-value" id="aiAcc">--%</span>
+										<div class="metric-bar"><div class="metric-fill" style="width: 94%"></div></div>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Precision</span>
+										<span class="metric-value" id="aiPrec">--%</span>
+										<div class="metric-bar"><div class="metric-fill" style="width: 92%"></div></div>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">Recall</span>
+										<span class="metric-value" id="aiRec">--%</span>
+										<div class="metric-bar"><div class="metric-fill" style="width: 89%"></div></div>
+									</div>
+									<div class="metric-item">
+										<span class="metric-label">F1-Score</span>
+										<span class="metric-value" id="aiF1">--%</span>
+										<div class="metric-bar"><div class="metric-fill" style="width: 91%"></div></div>
+									</div>
+								</div>
+							</div>
+							<div class="metric-card">
+								<h4>🎯 Detection Metrics</h4>
+								<div class="confidence-meter">
+									<div class="confidence-label">Leak Confidence</div>
+									<div class="confidence-bar">
+										<div class="confidence-fill" id="aiLeakConfidence" style="width: 65%"></div>
+									</div>
+									<span class="confidence-value" id="aiConfidenceText">65%</span>
+								</div>
+								<div class="last-detection">
+									<span class="detection-label">Last Detection:</span>
+									<span class="detection-value" id="aiLastDetection">J-8 @ 14:23:12</span>
+								</div>
+								<div class="anomaly-score">
+									<span class="score-label">Current Anomaly Score:</span>
+									<span class="score-value" id="aiAnomalyScore">--</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="js/map.js"></script>
+	<script src="js/app.js"></script>
+</body>
+</html>
