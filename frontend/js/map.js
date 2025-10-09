@@ -3,11 +3,6 @@
  * Interactive canvas-based network diagram for water distribution system
  */
 
-// 🌟 Dynamic BASE_URL Configuration
-const BASE_URL = window.location.hostname === "localhost"
-  ? "http://localhost:8000"
-  : "https://water-sim-backend.onrender.com";
-
 // Global network variables
 let epanetCanvas;
 let ctx;

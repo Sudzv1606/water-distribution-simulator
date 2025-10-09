@@ -1,4 +1,4 @@
-// 🌟 Dynamic BASE_URL Configuration
+// 🌟 Dynamic BASE_URL Configuration - Single Declaration
 const BASE_URL = window.location.hostname === "localhost"
   ? "http://localhost:8000"
   : "https://water-sim-backend.onrender.com";
@@ -257,7 +257,14 @@ async function refreshAnomalies(){
 	try{
 		const res = await fetch(`${BASE_URL}/api/anomalies/recent?limit=10`);
 		const rows = await res.json();
+
+		// Add null check for anomTable element
 		const tbody = document.querySelector('#anomTable tbody');
+		if (!tbody) {
+			console.log('📊 Anomaly table not found - skipping update');
+			return;
+		}
+
 		tbody.innerHTML = '';
 		rows.forEach(r => {
 			const tr = document.createElement('tr');
@@ -265,7 +272,9 @@ async function refreshAnomalies(){
 			tr.innerHTML = `<td>${t}</td><td>${Number(r.score).toFixed(2)}</td><td>${r.location || ''}</td>`;
 			tbody.appendChild(tr);
 		});
-	} catch(e){ appendLog('anom error: ' + e); }
+	} catch(e){
+		console.log('anom error: ' + e);
+	}
 }
 
 seedHistory();
