@@ -11,6 +11,279 @@ const POLL_INTERVAL = 3000; // 3 seconds
 console.log('🔧 Using BASE_URL:', BASE_URL);
 
 const statusEl = document.getElementById('status');
+
+// 🌟 Enhanced WebSocket Manager with Connection Reliability
+class WebSocketManager {
+    constructor(url, options = {}) {
+        this.url = url;
+        this.options = {
+            maxRetries: 5,
+            retryDelay: 1000,
+            maxRetryDelay: 30000,
+            backoffFactor: 2,
+            ...options
+        };
+        this.retryCount = 0;
+        this.ws = null;
+        this.isConnecting = false;
+        this.isManuallyClosed = false;
+        this.reconnectTimer = null;
+    }
+
+    connect() {
+        if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+            return;
+        }
+
+        this.isConnecting = true;
+        this.updateConnectionStatus('Connecting...');
+
+        try {
+            this.ws = new WebSocket(this.url);
+            this.setupEventHandlers();
+        } catch (error) {
+            console.error('WebSocket connection error:', error);
+            this.handleConnectionFailure();
+        }
+    }
+
+    setupEventHandlers() {
+        this.ws.onopen = () => {
+            console.log('WebSocket connected successfully');
+            this.isConnecting = false;
+            this.retryCount = 0;
+            this.updateConnectionStatus('Connected (WebSocket)');
+
+            // Reset retry delay on successful connection
+            this.options.retryDelay = 1000;
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        this.ws.onclose = (event) => {
+            console.log('WebSocket disconnected:', event.code, event.reason);
+            this.isConnecting = false;
+
+            if (!this.isManuallyClosed) {
+                this.updateConnectionStatus('Disconnected');
+                this.handleConnectionFailure();
+            }
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.isConnecting = false;
+        };
+    }
+
+    handleConnectionFailure() {
+        if (this.retryCount < this.options.maxRetries) {
+            this.retryCount++;
+            const delay = Math.min(
+                this.options.retryDelay * Math.pow(this.options.backoffFactor, this.retryCount - 1),
+                this.options.maxRetryDelay
+            );
+
+            console.log(`WebSocket connection failed. Retrying in ${delay}ms (attempt ${this.retryCount}/${this.options.maxRetries})`);
+
+            // Update UI with retry status
+            this.updateConnectionStatus(`Reconnecting... (${this.retryCount}/${this.options.maxRetries})`);
+
+            this.reconnectTimer = setTimeout(() => this.connect(), delay);
+        } else {
+            console.error('Max WebSocket retry attempts reached. Falling back to polling.');
+            this.updateConnectionStatus('Using Polling Mode');
+            this.startPollingFallback();
+        }
+    }
+
+    updateConnectionStatus(status) {
+        if (statusEl) {
+            statusEl.textContent = status;
+
+            // Update status styling based on connection state
+            if (status.includes('Connected')) {
+                statusEl.style.background = '#10341f';
+                statusEl.style.borderColor = '#1f6f3b';
+            } else if (status.includes('Reconnecting')) {
+                statusEl.style.background = '#451a03';
+                statusEl.style.borderColor = '#b45309';
+            } else if (status.includes('Polling')) {
+                statusEl.style.background = '#1e3a2e';
+                statusEl.style.borderColor = '#38a169';
+            } else {
+                statusEl.style.background = '#3a0a0a';
+                statusEl.style.borderColor = '#7c1d18';
+            }
+        }
+    }
+
+    startPollingFallback() {
+        // Use existing polling system
+        if (!pollingInterval) {
+            startPollingSystem();
+        }
+    }
+
+    handleMessage(data) {
+        // Process incoming data through data synchronizer if available
+        if (window.dataSynchronizer) {
+            window.dataSynchronizer.processIncomingData(data);
+        } else {
+            // Fallback to direct processing
+            this.processMessageData(data);
+        }
+    }
+
+    processMessageData(data) {
+        // Update charts with real-time data from backend
+        if (data.spectral_freq) pushPoint(spectralChart, data.spectral_freq);
+        if (data.kurtosis && data.skewness) pushDualPoint(statsChart, data.kurtosis, data.skewness);
+        if (data.rms_power) pushPoint(rmsChart, data.rms_power);
+
+        // Update KPIs
+        if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
+        if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
+
+        // Update Model Performance Metrics
+        if (data.accuracy !== undefined) {
+            const accScoreEl = document.getElementById('accScore');
+            if (accScoreEl) accScoreEl.textContent = (data.accuracy * 100).toFixed(2) + '%';
+        }
+        if (data.precision !== undefined) {
+            const precScoreEl = document.getElementById('precScore');
+            if (precScoreEl) precScoreEl.textContent = (data.precision * 100).toFixed(2) + '%';
+        }
+        if (data.recall !== undefined) {
+            const recScoreEl = document.getElementById('recScore');
+            if (recScoreEl) recScoreEl.textContent = (data.recall * 100).toFixed(2) + '%';
+        }
+        if (data.auc !== undefined) {
+            const aucScoreEl = document.getElementById('aucScore');
+            if (aucScoreEl) aucScoreEl.textContent = (data.auc * 100).toFixed(2) + '%';
+        }
+
+        // Update bottom panel data
+        updateBottomPanelData(data);
+
+        appendLog(`📊 WebSocket: Freq=${data.spectral_freq?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}`);
+    }
+
+    close() {
+        this.isManuallyClosed = true;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
+        if (this.ws) {
+            this.ws.close();
+        }
+    }
+}
+
+// 🌟 Data Synchronizer for Improved Data Consistency
+class DataSynchronizer {
+    constructor() {
+        this.lastDataTimestamp = 0;
+        this.processedDataIds = new Set();
+        this.maxDataIdHistory = 1000;
+    }
+
+    processIncomingData(data) {
+        // Check if data has a timestamp
+        const timestamp = data.timestamp || data.time || Date.now();
+
+        // Skip if data is older than last processed data
+        if (timestamp < this.lastDataTimestamp) {
+            console.log('Skipping outdated data:', timestamp);
+            return false;
+        }
+
+        // Generate unique data ID based on timestamp and key data
+        const dataId = this.generateDataId(data);
+
+        // Skip if already processed
+        if (this.processedDataIds.has(dataId)) {
+            console.log('Skipping duplicate data:', dataId);
+            return false;
+        }
+
+        // Add to processed data set
+        this.processedDataIds.add(dataId);
+
+        // Clean up old data IDs to prevent memory leaks
+        if (this.processedDataIds.size > this.maxDataIdHistory) {
+            const idsArray = Array.from(this.processedDataIds);
+            const toRemove = idsArray.slice(0, idsArray.length - this.maxDataIdHistory);
+            toRemove.forEach(id => this.processedDataIds.delete(id));
+        }
+
+        // Update last timestamp
+        this.lastDataTimestamp = timestamp;
+
+        // Process the data
+        this.updateUI(data);
+
+        return true;
+    }
+
+    generateDataId(data) {
+        // Create ID from timestamp and key values
+        const keyValues = [
+            data.spectral_freq || 0,
+            data.rms_power || 0,
+            data.kurtosis || 0,
+            data.skewness || 0
+        ].join('|');
+
+        return `${data.timestamp}_${keyValues}`;
+    }
+
+    updateUI(data) {
+        // Update charts with real-time data
+        if (data.spectral_freq) pushPoint(spectralChart, data.spectral_freq);
+        if (data.kurtosis && data.skewness) pushDualPoint(statsChart, data.kurtosis, data.skewness);
+        if (data.rms_power) pushPoint(rmsChart, data.rms_power);
+
+        // Update KPIs
+        if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
+        if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
+
+        // Update Model Performance Metrics
+        if (data.accuracy !== undefined) {
+            const accScoreEl = document.getElementById('accScore');
+            if (accScoreEl) accScoreEl.textContent = (data.accuracy * 100).toFixed(2) + '%';
+        }
+        if (data.precision !== undefined) {
+            const precScoreEl = document.getElementById('precScore');
+            if (precScoreEl) precScoreEl.textContent = (data.precision * 100).toFixed(2) + '%';
+        }
+        if (data.recall !== undefined) {
+            const recScoreEl = document.getElementById('recScore');
+            if (recScoreEl) recScoreEl.textContent = (data.recall * 100).toFixed(2) + '%';
+        }
+        if (data.auc !== undefined) {
+            const aucScoreEl = document.getElementById('aucScore');
+            if (aucScoreEl) aucScoreEl.textContent = (data.auc * 100).toFixed(2) + '%';
+        }
+
+        // Update bottom panel data
+        if (window.updateBottomPanelData) {
+            window.updateBottomPanelData(data);
+        }
+
+        // Update map with sensor data
+        if (window.updateMapWithSensorData) {
+            window.updateMapWithSensorData(data);
+        }
+    }
+}
 const alertEl = document.getElementById('alert');
 const logEl = document.getElementById('log');
 const kpiSpectral = document.getElementById('kpiSpectral');
@@ -307,11 +580,120 @@ async function refreshAnomalies(){
 	}
 }
 
-// 🌟 Initialize WebSocket connection (with polling fallback)
+// 🌟 Initialize Enhanced WebSocket Manager and Data Synchronizer
+let wsManager;
+let dataSynchronizer;
+
+// Initialize the new systems
+function initializeEnhancedSystems() {
+    console.log('🚀 Initializing enhanced WebSocket and data synchronization systems...');
+
+    // Initialize data synchronizer
+    dataSynchronizer = new DataSynchronizer();
+    window.dataSynchronizer = dataSynchronizer;
+    console.log('✅ Data synchronizer initialized');
+
+    // Initialize WebSocket manager
+    wsManager = new WebSocketManager(WS_URL);
+    window.wsManager = wsManager;
+    console.log('✅ WebSocket manager initialized');
+
+    // Start WebSocket connection
+    wsManager.connect();
+    console.log('🔌 WebSocket connection initiated');
+}
+
+// 🌟 Initialize WebSocket connection (with polling fallback) - Legacy function for compatibility
+function testWebSocketConnection() {
+    console.log('🔌 Legacy WebSocket connection function called - using new WebSocket manager');
+
+    // Use the new WebSocket manager if available
+    if (wsManager) {
+        wsManager.connect();
+    } else {
+        // Fallback to old method if new system isn't ready
+        console.log('⚠️ WebSocket manager not ready, using legacy connection');
+        initializeEnhancedSystems();
+    }
+}
+
+// Enhanced polling system that works with data synchronizer
+function startPollingSystem() {
+    if (pollingInterval) {
+        console.log('🔄 Polling system already running');
+        return;
+    }
+
+    appendLog('🔄 Starting enhanced polling system (3 second intervals)');
+
+    pollingInterval = setInterval(async () => {
+        try {
+            // Poll status endpoint for real-time data
+            const response = await fetch(`${BASE_URL}/api/status`);
+            const data = await response.json();
+
+            if (paused) return;
+
+            statusEl.textContent = 'Connected (Polling)';
+            statusEl.style.background = '#10341f';
+            statusEl.style.borderColor = '#1f6f3b';
+
+            // Process data through data synchronizer if available
+            if (dataSynchronizer) {
+                dataSynchronizer.processIncomingData(data);
+            } else {
+                // Fallback to direct processing
+                processPollingData(data);
+            }
+
+            appendLog(`📊 Polling: Freq=${data.spectral_freq?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}`);
+
+        } catch (error) {
+            statusEl.textContent = 'Polling Error';
+            statusEl.style.background = '#3a0a0a';
+            statusEl.style.borderColor = '#7c1d18';
+            appendLog('❌ Polling error: ' + error.message);
+        }
+    }, POLL_INTERVAL);
+}
+
+// Fallback data processing for polling when data synchronizer isn't available
+function processPollingData(data) {
+    // Update charts with real-time data from backend
+    if (data.spectral_freq) pushPoint(spectralChart, data.spectral_freq);
+    if (data.kurtosis && data.skewness) pushDualPoint(statsChart, data.kurtosis, data.skewness);
+    if (data.rms_power) pushPoint(rmsChart, data.rms_power);
+
+    // Update KPIs
+    if (data.spectral_freq) kpiSpectral.textContent = data.spectral_freq.toFixed(2);
+    if (data.rms_power) kpiRMS.textContent = data.rms_power.toFixed(3);
+
+    // Update Model Performance Metrics
+    if (data.accuracy !== undefined) {
+        const accScoreEl = document.getElementById('accScore');
+        if (accScoreEl) accScoreEl.textContent = (data.accuracy * 100).toFixed(2) + '%';
+    }
+    if (data.precision !== undefined) {
+        const precScoreEl = document.getElementById('precScore');
+        if (precScoreEl) precScoreEl.textContent = (data.precision * 100).toFixed(2) + '%';
+    }
+    if (data.recall !== undefined) {
+        const recScoreEl = document.getElementById('recScore');
+        if (recScoreEl) recScoreEl.textContent = (data.recall * 100).toFixed(2) + '%';
+    }
+    if (data.auc !== undefined) {
+        const aucScoreEl = document.getElementById('aucScore');
+        if (aucScoreEl) aucScoreEl.textContent = (data.auc * 100).toFixed(2) + '%';
+    }
+
+    // Update bottom panel data
+    updateBottomPanelData(data);
+}
+
+// Initialize enhanced systems early
 setTimeout(() => {
-    console.log('🔌 Attempting WebSocket connection...');
-    testWebSocketConnection();
-}, 1000);
+    initializeEnhancedSystems();
+}, 500);
 
 seedHistory();
 startPollingSystem(); // Use polling as fallback

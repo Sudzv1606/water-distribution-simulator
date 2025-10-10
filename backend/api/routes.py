@@ -135,9 +135,17 @@ async def get_status():
 	precision = max(0.7, min(0.98, 0.94 - total_leak_severity * 0.08))
 	recall = max(0.7, min(0.97, 0.93 - total_leak_severity * 0.06))
 
-	# Calculate leak confidence based on anomaly score
-	anomaly_score = total_leak_severity * 100  # 0-100 scale
-	leak_confidence = min(100, anomaly_score * 1.2)  # Scale up slightly
+	# Calculate leak confidence based on ACTUAL leak status
+	if total_leak_severity > 0:
+		# LEAK PRESENT - High confidence based on severity
+		base_confidence = 60  # Start at 60% for any leak
+		severity_multiplier = total_leak_severity * 35  # Up to 35% more for max severity
+		leak_confidence = min(95, base_confidence + severity_multiplier)
+		anomaly_score = min(0.95, 0.5 + (total_leak_severity * 0.4))
+	else:
+		# NO LEAK - Keep confidence very low (<20%)
+		leak_confidence = max(2, 15 - (random.random() * 8))  # 2-13% range for normal operation
+		anomaly_score = max(0.05, 0.15 - (random.random() * 0.08))  # 0.05-0.15 range for normal operation
 
 	return {
 		"spectral_freq": round(spectral_freq, 2),

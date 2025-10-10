@@ -769,20 +769,41 @@ function getPipeConditionVariation(pipe) {
 }
 
 /**
- * Generate realistic AI data for pipe
+ * Generate realistic AI data for pipe based on ACTUAL leak status
  */
 function generateAIData(pipe) {
-    // Base anomaly score influenced by pipe age, material, and current flow
-    const materialRisk = { 'DI': 0.1, 'PVC': 0.2, 'PE': 0.3, 'CI': 0.4 };
-    const baseAnomaly = materialRisk[pipe.material] || 0.2;
+    // Check if there's actually a leak in this pipe
+    const actualLeakSeverity = activeScenarios[pipe.id] || 0;
 
-    // Higher flow velocity = higher leak probability
-    const velocityFactor = Math.min(0.8, pipe.velocity / 2);
-    const leakProbability = Math.round((baseAnomaly + velocityFactor + (Math.random() * 0.3)) * 100);
+    let leakProbability, anomalyScore;
+
+    if (actualLeakSeverity > 0) {
+        // LEAK PRESENT - Calculate probability based on actual leak severity
+        const baseProbability = 60; // Start at 60% for any leak
+        const severityMultiplier = actualLeakSeverity * 35; // Up to 35% more for max severity
+        const materialRisk = { 'DI': 5, 'PVC': 8, 'PE': 10, 'CI': 12 }; // Material affects confidence
+        const materialAdjustment = materialRisk[pipe.material] || 8;
+
+        leakProbability = Math.min(95, Math.max(60, baseProbability + severityMultiplier + materialAdjustment));
+
+        // Anomaly score scales with leak severity
+        anomalyScore = Math.min(0.95, 0.5 + (actualLeakSeverity * 0.4) + (Math.random() * 0.1));
+
+    } else {
+        // NO LEAK - Keep probability low (<20%)
+        const materialRisk = { 'DI': 5, 'PVC': 8, 'PE': 10, 'CI': 12 };
+        const baseRisk = materialRisk[pipe.material] || 8;
+
+        // Very low baseline probability for normal operation
+        leakProbability = Math.max(2, baseRisk - 3 + (Math.random() * 6)); // 2-13% range
+
+        // Very low anomaly score for normal operation
+        anomalyScore = Math.max(0.05, 0.15 - (Math.random() * 0.08)); // 0.05-0.15 range
+    }
 
     return {
-        leakProbability: Math.min(95, Math.max(5, leakProbability)),
-        anomalyScore: Math.round((baseAnomaly + (Math.random() * 0.4)) * 100) / 100
+        leakProbability: Math.round(leakProbability),
+        anomalyScore: Math.round(anomalyScore * 100) / 100
     };
 }
 
@@ -802,18 +823,43 @@ function getSignalQuality(pipe) {
 }
 
 /**
- * Update tooltip content with pipe data
+ * Update tooltip content with pipe data and CORRECT flow values
  */
 function updateTooltipContent(pipe, acousticData, aiData) {
     // Update header
     document.getElementById('tooltipPipeName').textContent = pipe.name;
 
-    // Update hydraulic data
+    // Update hydraulic data - show NODE flow values that match screen display
     document.getElementById('tooltipLength').textContent = `${pipe.length}m`;
     document.getElementById('tooltipDiameter').textContent = `${pipe.diameter}mm`;
     document.getElementById('tooltipMaterial').textContent = getMaterialFullName(pipe.material);
-    document.getElementById('tooltipFlow').textContent = `${pipe.flow.toFixed(1)} L/s`;
-    document.getElementById('tooltipVelocity').textContent = `${pipe.velocity.toFixed(1)} m/s`;
+
+    // Get connected nodes and show their flow values (matches screen display)
+    const startNode = networkNodes[pipe.startNode];
+    const endNode = networkNodes[pipe.endNode];
+
+    if (startNode && endNode) {
+        // Show average of connected node flows (matches what user sees on screen)
+        const avgNodeFlow = (startNode.flow + endNode.flow) / 2;
+        document.getElementById('tooltipFlow').textContent = `${avgNodeFlow.toFixed(1)} L/s`;
+
+        // Calculate velocity based on node flows and pipe diameter
+        const crossSectionalArea = Math.PI * Math.pow(pipe.diameter / 2000, 2); // m²
+        const avgVelocity = avgNodeFlow / 1000 / crossSectionalArea; // m/s
+        document.getElementById('tooltipVelocity').textContent = `${avgVelocity.toFixed(1)} m/s`;
+
+        console.log('🔧 Tooltip flow values:', {
+            startNodeFlow: startNode.flow.toFixed(1),
+            endNodeFlow: endNode.flow.toFixed(1),
+            avgFlow: avgNodeFlow.toFixed(1),
+            pipeFlow: pipe.flow.toFixed(1),
+            calculatedVelocity: avgVelocity.toFixed(1)
+        });
+    } else {
+        // Fallback to pipe values if nodes not available
+        document.getElementById('tooltipFlow').textContent = `${pipe.flow.toFixed(1)} L/s`;
+        document.getElementById('tooltipVelocity').textContent = `${pipe.velocity.toFixed(1)} m/s`;
+    }
 
     // Update acoustic data
     document.getElementById('tooltipSpectral').textContent = `${acousticData.spectralFreq} Hz`;
@@ -1683,7 +1729,7 @@ function setupEpanetControlPanelHandlers() {
     console.log('✅ EPANET control panel handlers set up');
 }
 
-// 🌟 UPDATE MAP WITH SENSOR DATA - This is the missing function!
+// 🌟 UPDATE MAP WITH SENSOR DATA - Enhanced with tooltip synchronization
 function updateMapWithSensorData(data) {
     console.log('🗺️ Updating map with sensor data:', data);
 
@@ -1720,12 +1766,34 @@ function updateMapWithSensorData(data) {
         // Force immediate visual update
         console.log('🎨 Forcing network redraw with updated data');
         drawEpanetNetwork();
+
+        // Update tooltip if it's currently visible and showing a pipe
+        updateTooltipWithLatestData();
     }
 
     // Update anomaly location if present
     if (data.anomaly && data.anomaly.location) {
         console.log('🚨 Anomaly detected at:', data.anomaly.location);
         // Could add visual anomaly indicators here
+    }
+}
+
+/**
+ * Update tooltip with latest real-time data if it's currently visible
+ */
+function updateTooltipWithLatestData() {
+    const tooltip = document.getElementById('pipeTooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        console.log('🔄 Updating visible tooltip with latest real-time data');
+
+        // Re-run tooltip content update with current data
+        const pipe = networkPipes[epanetSelectedPipe];
+        if (pipe) {
+            const acousticData = generateAcousticData(pipe);
+            const aiData = generateAIData(pipe);
+            updateTooltipContent(pipe, acousticData, aiData);
+            console.log('✅ Tooltip updated with latest real-time values');
+        }
     }
 }
 
