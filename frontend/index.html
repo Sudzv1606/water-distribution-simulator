@@ -132,6 +132,11 @@
 
 			</section>
 
+			<!-- 📈 AUC Graph Section -->
+			<section class="auc-section">
+				<div id="auc-graph-container"></div>
+			</section>
+
 			<div id="alert" class="alert"></div>
 			<pre id="log" class="log"></pre>
 		</div>
@@ -235,12 +240,10 @@
 
 			<!-- 🎛️ Bottom Sliding Panel -->
 			<div class="bottom-panel">
-				<div class="panel-header">
+					<div class="panel-header">
 					<div class="panel-tabs">
 						<button class="tab active">Scenario Controls</button>
 						<button class="tab">Hydraulic Data</button>
-						<button class="tab">Acoustic Data</button>
-						<button class="tab">AI Metrics</button>
 					</div>
 					<button class="panel-toggle-btn" id="panelToggleBtn" title="Toggle Panel">
 						<span class="toggle-icon">⏵</span>
@@ -367,107 +370,16 @@
 						</div>
 					</div>
 
-					<!-- Acoustic Data Tab -->
-					<div class="tab-content" id="acousticTab">
-						<div class="data-grid">
-							<div class="metric-card">
-								<h4>� Spectral Analysis</h4>
-								<div class="metric-grid">
-									<div class="metric-item">
-										<span class="metric-label">Dominant Freq</span>
-										<span class="metric-value" id="specFreq">-- Hz</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Frequency Range</span>
-										<span class="metric-value" id="freqRange">-- Hz</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Peak Amplitude</span>
-										<span class="metric-value" id="peakAmp">-- dB</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Harmonic Distortion</span>
-										<span class="metric-value" id="harmonicDist">--%</span>
-									</div>
-								</div>
-							</div>
-							<div class="metric-card">
-								<h4>📊 Signal Quality</h4>
-								<div class="metric-grid">
-									<div class="metric-item">
-										<span class="metric-label">SNR</span>
-										<span class="metric-value" id="snr">-- dB</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">THD</span>
-										<span class="metric-value" id="thd">--%</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Crest Factor</span>
-										<span class="metric-value" id="crestFactor">--</span>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Dynamic Range</span>
-										<span class="metric-value" id="dynamicRange">-- dB</span>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
 
-					<!-- AI Metrics Tab -->
-					<div class="tab-content" id="aiTab">
-						<div class="data-grid">
-							<div class="metric-card">
-								<h4>🤖 Model Performance</h4>
-								<div class="metric-grid">
-									<div class="metric-item">
-										<span class="metric-label">Accuracy</span>
-										<span class="metric-value" id="aiAcc">--%</span>
-										<div class="metric-bar"><div class="metric-fill" style="width: 94%"></div></div>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Precision</span>
-										<span class="metric-value" id="aiPrec">--%</span>
-										<div class="metric-bar"><div class="metric-fill" style="width: 92%"></div></div>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">Recall</span>
-										<span class="metric-value" id="aiRec">--%</span>
-										<div class="metric-bar"><div class="metric-fill" style="width: 89%"></div></div>
-									</div>
-									<div class="metric-item">
-										<span class="metric-label">F1-Score</span>
-										<span class="metric-value" id="aiF1">--%</span>
-										<div class="metric-bar"><div class="metric-fill" style="width: 91%"></div></div>
-									</div>
-								</div>
-							</div>
-							<div class="metric-card">
-								<h4>🎯 Detection Metrics</h4>
-								<div class="confidence-meter">
-									<div class="confidence-label">Leak Confidence</div>
-									<div class="confidence-bar">
-										<div class="confidence-fill" id="aiLeakConfidence" style="width: 65%"></div>
-									</div>
-									<span class="confidence-value" id="aiConfidenceText">65%</span>
-								</div>
-								<div class="last-detection">
-									<span class="detection-label">Last Detection:</span>
-									<span class="detection-value" id="aiLastDetection">J-8 @ 14:23:12</span>
-								</div>
-								<div class="anomaly-score">
-									<span class="score-label">Current Anomaly Score:</span>
-									<span class="score-value" id="aiAnomalyScore">--</span>
-								</div>
-							</div>
-						</div>
-					</div>
+
+
 				</div>
 			</div>
 		</div>
 	</div>
+	<script src="js/sensor-data.js"></script>
 	<script src="js/map.js"></script>
+	<script src="js/auc-graph.js"></script>
 	<script src="js/app.js"></script>
 </body>
 </html>

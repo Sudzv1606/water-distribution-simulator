@@ -348,14 +348,7 @@ function switchTab(tabName) {
             targetTabContent = document.getElementById('hydraulicTab');
             activeTab = 'hydraulicTab';
             break;
-        case 'Acoustic Data':
-            targetTabContent = document.getElementById('acousticTab');
-            activeTab = 'acousticTab';
-            break;
-        case 'AI Metrics':
-            targetTabContent = document.getElementById('aiTab');
-            activeTab = 'aiTab';
-            break;
+
     }
 
     if (targetTabContent) {

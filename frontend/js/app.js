@@ -1,11 +1,9 @@
-// 🌟 Railway Backend Configuration - UPDATE THIS URL AFTER DEPLOYMENT
-const BASE_URL = "https://water-distribution-simulator-production.up.railway.app";
+// 🌟 SENSOR DATA INTEGRATION - Using your collected CSV data
+// Simplified system using hardcoded values from your sensor data
 
-// 🌟 WebSocket URL for real-time updates (fallback to polling)
-const WS_URL = "wss://water-distribution-simulator-production.up.railway.app/ws";
-
-// 🌟 Production-Ready Polling System (No WebSocket dependency)
-let pollingInterval = null;
+// 🌟 API Configuration Constants
+const BASE_URL = 'http://localhost:8000';
+const WS_URL = 'ws://localhost:8000/ws';
 const POLL_INTERVAL = 3000; // 3 seconds
 
 console.log('🔧 Using BASE_URL:', BASE_URL);
@@ -282,6 +280,11 @@ class DataSynchronizer {
         if (window.updateMapWithSensorData) {
             window.updateMapWithSensorData(data);
         }
+
+        // Update AUC graph with latest data
+        if (data.auc !== undefined && window.updateAUCGraph) {
+            window.updateAUCGraph(data.auc);
+        }
     }
 }
 const alertEl = document.getElementById('alert');
@@ -291,6 +294,10 @@ const kpiRMS = document.getElementById('kpiRMS');
 const thWarnEl = document.getElementById('thWarn');
 const thLeakEl = document.getElementById('thLeak');
 let paused = false;
+
+// 🌟 Global variable declarations for data systems
+let pollingInterval = null; // Backend polling system
+let sensorDataInterval = null; // CSV data playback system
 
 let netCache = { nodes: [], links: [] };
 
@@ -302,6 +309,8 @@ let assignedContractor = '';
 // 🌟 Simulation Mode Variables
 let selectedPipe = 'P1';
 let simLeaks = {};
+// 🌟 Make simLeaks globally accessible for sensor-data.js
+window.simLeaks = simLeaks;
 let simDemandMultiplier = 1.0;
 let simStartTime = Date.now();
 
@@ -686,20 +695,169 @@ function processPollingData(data) {
         if (aucScoreEl) aucScoreEl.textContent = (data.auc * 100).toFixed(2) + '%';
     }
 
+    // 🔧 FIXED: Process hydraulic node_pressures data from backend
+    if (data.node_pressures) {
+        console.log('🔧 Processing node_pressures data:', data.node_pressures);
+
+        // Update hydraulic data displays
+        updateHydraulicData(data.node_pressures);
+
+        // Update network visualization if in monitoring mode
+        if (window.currentMode === 'monitoring' && window.renderNetwork) {
+            window.renderNetwork(data.node_pressures);
+        }
+
+        // Update map with current pressure data
+        if (window.updateMapWithSensorData) {
+            window.updateMapWithSensorData(data);
+        }
+
+        // Log pressure changes for debugging
+        const pressureSummary = Object.entries(data.node_pressures)
+            .map(([node, pressure]) => `${node}: ${pressure.toFixed(1)} psi`)
+            .join(', ');
+        appendLog(`🔧 Hydraulic Update: ${pressureSummary}`);
+    }
+
     // Update bottom panel data
     updateBottomPanelData(data);
 }
 
-// Initialize enhanced systems early
-setTimeout(() => {
-    initializeEnhancedSystems();
-}, 500);
+// 🌟 SENSOR DATA PLAYBACK SYSTEM - Using your collected CSV data
 
-seedHistory();
-startPollingSystem(); // Use polling as fallback
-drawNetwork();
-refreshAnomalies();
-setInterval(refreshAnomalies, 10000);
+// Initialize sensor data playback system
+function initializeSensorDataSystem() {
+    console.log('🚀 Initializing sensor data playback system...');
+
+    // Start with first data point
+    const initialData = getCurrentSensorData();
+    updateDashboardWithSensorData(initialData);
+
+    // Start automatic playback
+    startSensorDataPlayback();
+
+    console.log('✅ Sensor data system initialized with your CSV data');
+}
+
+// Update dashboard with sensor data
+function updateDashboardWithSensorData(data) {
+    console.log('📊 Updating dashboard with sensor data:', data);
+
+    // Update spectral frequency chart and KPI
+    if (data.spectral_frequency) {
+        pushPoint(spectralChart, data.spectral_frequency);
+        kpiSpectral.textContent = data.spectral_frequency.toFixed(2);
+    }
+
+    // Update RMS power chart and KPI
+    if (data.rms_power) {
+        pushPoint(rmsChart, data.rms_power);
+        kpiRMS.textContent = data.rms_power.toFixed(3);
+    }
+
+    // Update kurtosis and skewness charts - FIXED: Added missing chart updates
+    if (data.kurtosis !== undefined && data.skewness !== undefined) {
+        console.log('📈 Updating kurtosis and skewness charts:', data.kurtosis, data.skewness);
+        pushDualPoint(statsChart, data.kurtosis, data.skewness);
+    }
+
+    // Update leak detection rate based on leak_detected flag
+    if (data.leak_detected !== undefined) {
+        const leakRateEl = document.getElementById('kpiLeakRate');
+        if (leakRateEl) {
+            const confidence = data.leak_detected === 1 ? 85 : 15; // High confidence for leak, low for no leak
+            leakRateEl.textContent = confidence.toFixed(1) + '%';
+        }
+    }
+
+    // Update status indicator
+    statusEl.textContent = 'Connected (CSV Data)';
+    statusEl.style.background = '#10341f';
+    statusEl.style.borderColor = '#1f6f3b';
+
+    // Update map with sensor data
+    if (window.updateMapWithSensorData) {
+        window.updateMapWithSensorData(data);
+    }
+
+    // Update bottom panel data - FIXED: Added missing bottom panel update
+    if (window.updateBottomPanelData) {
+        console.log('📋 Updating bottom panel data with sensor data');
+        window.updateBottomPanelData(data);
+    }
+
+    // Log the update
+    appendLog(`📊 CSV Data: Freq=${data.spectral_frequency?.toFixed(1)}Hz, RMS=${data.rms_power?.toFixed(2)}, Kurtosis=${data.kurtosis?.toFixed(2)}, Skewness=${data.skewness?.toFixed(2)}, Leak=${data.leak_detected}`);
+}
+
+// Start automatic sensor data playback
+function startSensorDataPlayback() {
+    if (sensorDataInterval) {
+        clearInterval(sensorDataInterval);
+    }
+
+    sensorDataInterval = setInterval(() => {
+        const data = getNextSensorData();
+        updateDashboardWithSensorData(data);
+    }, 2000); // Update every 2 seconds
+
+    console.log('▶️ Sensor data playback started');
+}
+
+// Pause sensor data playback
+function pauseSensorDataPlayback() {
+    if (sensorDataInterval) {
+        clearInterval(sensorDataInterval);
+        sensorDataInterval = null;
+        console.log('⏸️ Sensor data playback paused');
+    }
+}
+
+// Reset sensor data playback to beginning
+function resetSensorDataPlayback() {
+    resetSensorPlayback();
+    const initialData = getCurrentSensorData();
+    updateDashboardWithSensorData(initialData);
+    console.log('🔄 Sensor data playback reset to beginning');
+}
+
+// Initialize the sensor data system
+setTimeout(() => {
+    console.log('🚀 Starting sensor data system initialization...');
+    initializeSensorDataSystem();
+
+    // Initialize AUC monitoring graph if available
+    if (window.initAUCMonitoring) {
+        window.initAUCMonitoring();
+        console.log('📊 AUC monitoring graph initialized');
+    }
+
+    // Force update model performance metrics after initialization
+    setTimeout(() => {
+        console.log('🔧 Forcing model performance metrics update...');
+        const sampleData = getCurrentSensorData();
+        console.log('📊 Sample enhanced data:', sampleData);
+
+        // Update model performance elements directly
+        const accScoreEl = document.getElementById('accScore');
+        const precScoreEl = document.getElementById('precScore');
+        const recScoreEl = document.getElementById('recScore');
+        const aucScoreEl = document.getElementById('aucScore');
+
+        if (accScoreEl) accScoreEl.textContent = (sampleData.accuracy * 100).toFixed(2) + '%';
+        if (precScoreEl) precScoreEl.textContent = (sampleData.precision * 100).toFixed(2) + '%';
+        if (recScoreEl) recScoreEl.textContent = (sampleData.recall * 100).toFixed(2) + '%';
+        if (aucScoreEl) aucScoreEl.textContent = (sampleData.auc * 100).toFixed(2) + '%';
+
+        console.log('✅ Model performance metrics forced update:', {
+            accuracy: (sampleData.accuracy * 100).toFixed(2) + '%',
+            precision: (sampleData.precision * 100).toFixed(2) + '%',
+            recall: (sampleData.recall * 100).toFixed(2) + '%',
+            auc: (sampleData.auc * 100).toFixed(2) + '%'
+        });
+    }, 1000);
+
+}, 500);
 
 // Initialize mode toggle after initial setup
 setTimeout(() => {
@@ -804,14 +962,7 @@ function switchTab(tabName) {
             targetTabContent = document.getElementById('hydraulicTab');
             activeTab = 'hydraulicTab';
             break;
-        case 'Acoustic Data':
-            targetTabContent = document.getElementById('acousticTab');
-            activeTab = 'acousticTab';
-            break;
-        case 'AI Metrics':
-            targetTabContent = document.getElementById('aiTab');
-            activeTab = 'aiTab';
-            break;
+
     }
 
     if (targetTabContent) {
@@ -949,6 +1100,14 @@ function setupModeToggle() {
                 window.currentMode = 'simulation';
                 console.log('✅ APP.JS: Switched to simulation mode');
 
+                // 🌟 MODE-BASED DATA SYSTEM: Disable CSV, Enable Backend Polling
+                console.log('🔄 DATA SYSTEMS: Switching to SIMULATION MODE');
+                console.log('⏸️ Disabling CSV sensor data playback');
+                pauseSensorDataPlayback(); // Stop CSV data
+
+                console.log('▶️ Enabling backend polling system');
+                startPollingSystem(); // Start real hydraulic data
+
                 // 🌟 Initialize EPANET Simulation Mode with new layout
                 setTimeout(() => {
                     console.log('🔍 Checking EPANET container after switch:', {
@@ -983,6 +1142,17 @@ function setupModeToggle() {
                 headerToggleBtn.textContent = 'Switch to Simulation Mode';
 
                 window.currentMode = 'monitoring';
+
+                // 🌟 MODE-BASED DATA SYSTEM: Disable Backend Polling, Enable CSV
+                console.log('🔄 DATA SYSTEMS: Switching to MONITORING MODE');
+                console.log('⏸️ Disabling backend polling system');
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+
+                console.log('▶️ Enabling CSV sensor data playback');
+                startSensorDataPlayback(); // Start CSV data
 
                 // Collapse panel when switching to monitoring mode
                 if (bottomPanel) {
@@ -1264,6 +1434,7 @@ function injectSimulatedLeak() {
 function clearAllLeaks() {
     currentLeakPipeline = null;
     simLeaks = {};
+    window.simLeaks = simLeaks; // 🌟 Update window variable
 
     // Update UI elements immediately
     updateFaultyPipelineStatus();
@@ -1293,6 +1464,7 @@ function applyDemandSpike() {
 
 function resetSimulation() {
     simLeaks = {};
+    window.simLeaks = simLeaks; // 🌟 Update window variable
     simDemandMultiplier = 1.0;
     document.getElementById('simDemandMul').value = 1.0;
     document.getElementById('simDemandValue').textContent = '1.0x';
@@ -1888,6 +2060,33 @@ function manualRedrawNetwork() {
     console.log('✅ DIRECT: Manual redraw completed');
 }
 
+/**
+ * Force immediate hydraulic data update with current leak state
+ */
+function forceHydraulicDataUpdate() {
+    console.log('🔧 DIRECT: Forcing hydraulic data update with current leak state');
+
+    // Get current sensor data to generate fresh hydraulic data
+    const currentData = getCurrentSensorData();
+    console.log('📊 Current sensor data for hydraulic update:', currentData);
+
+    // Update hydraulic data immediately with current leak state
+    if (currentData.node_pressures) {
+        updateHydraulicData(currentData.node_pressures);
+        console.log('✅ DIRECT: Hydraulic data updated with current leak state');
+    } else {
+        console.error('❌ DIRECT: No node_pressures in current data');
+    }
+
+    // Also update the log to show the pressure changes
+    if (currentData.node_pressures) {
+        const pressures = Object.entries(currentData.node_pressures)
+            .map(([node, pressure]) => `${node}: ${pressure.toFixed(1)} psi`)
+            .join(', ');
+        appendLog(`🔧 Hydraulic Update: ${pressures}`);
+    }
+}
+
 // 🌟 WebSocket Connection Test Function
 function testWebSocketConnection() {
     console.log('🔌 Testing WebSocket connection to:', WS_URL);
@@ -2383,6 +2582,10 @@ function injectSimulatedLeak() {
     // Update Faulty Pipeline Status UI immediately
     console.log('🚰 Updating Faulty Pipeline Status UI...');
     updateFaultyPipelineStatus();
+
+    // Force immediate hydraulic data update with current leak state
+    console.log('🔧 Forcing immediate hydraulic data update after leak injection...');
+    forceHydraulicDataUpdate();
 
     // Send to backend
     fetch(`${BASE_URL}/api/scenarios/leak`, {
