@@ -756,22 +756,40 @@ function processPollingData(data) {
 // Safe wrapper functions for sensor data operations
 function safeGetCurrentSensorData() {
     if (typeof window.getCurrentSensorData === 'function') {
-        return window.getCurrentSensorData();
+        try {
+            const data = window.getCurrentSensorData();
+            console.log('✅ Successfully loaded sensor data:', data);
+            return data;
+        } catch (error) {
+            console.error('❌ Error calling getCurrentSensorData:', error);
+            return getFallbackSensorData();
+        }
     } else {
         console.warn('⚠️ getCurrentSensorData function not available, using fallback data');
-        return {
-            spectral_frequency: 250,
-            rms_power: 10,
-            leak_detected: 0,
-            kurtosis: 0,
-            skewness: 0,
-            accuracy: 0.84,
-            precision: 0.81,
-            recall: 0.89,
-            auc: 0.85,
-            node_pressures: { 'P1': 52, 'P2': 48, 'P3': 55, 'P4': 50 }
-        };
+        return getFallbackSensorData();
     }
+}
+
+function getFallbackSensorData() {
+    console.log('📊 Using fallback sensor data');
+    return {
+        spectral_frequency: 250,
+        rms_power: 10,
+        leak_detected: 0,
+        kurtosis: 0,
+        skewness: 0,
+        accuracy: 0.84,
+        precision: 0.81,
+        recall: 0.89,
+        auc: 0.85,
+        node_pressures: { 'P1': 52, 'P2': 48, 'P3': 55, 'P4': 50 },
+        spectral_freq: 250,
+        snr: 25,
+        thd: 2.5,
+        crest_factor: 1.8,
+        dynamic_range: 80,
+        f1_score: 0.85
+    };
 }
 
 function safeGetNextSensorData() {
