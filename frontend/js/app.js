@@ -1,12 +1,40 @@
 // 🌟 SENSOR DATA INTEGRATION - Using your collected CSV data
 // Simplified system using hardcoded values from your sensor data
 
-// 🌟 API Configuration Constants
-const BASE_URL = 'http://localhost:8000';
-const WS_URL = 'ws://localhost:8000/ws';
+// 🌟 API Configuration Constants - Dynamic for deployment
+function getApiConfig() {
+    // Check if we're running on Railway (production) or locally (development)
+    const isProduction = window.location.hostname.includes('.railway.app') ||
+                        (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+
+    let BASE_URL, WS_URL;
+
+    if (isProduction) {
+        // Railway deployment - use same domain, different port
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+
+        // For Railway, both frontend and backend run on the same domain
+        // The backend API is typically available at the same hostname
+        BASE_URL = `${protocol}//${hostname}`;
+        WS_URL = `wss://${hostname}`;
+
+        console.log('🚀 Production mode detected:', { BASE_URL, WS_URL, hostname });
+    } else {
+        // Local development
+        BASE_URL = 'http://localhost:8000';
+        WS_URL = 'ws://localhost:8000/ws';
+        console.log('🔧 Development mode detected:', { BASE_URL, WS_URL });
+    }
+
+    return { BASE_URL, WS_URL };
+}
+
+// Initialize API configuration
+const { BASE_URL, WS_URL } = getApiConfig();
 const POLL_INTERVAL = 3000; // 3 seconds
 
-console.log('🔧 Using BASE_URL:', BASE_URL);
+console.log('🌐 API Configuration:', { BASE_URL, WS_URL, hostname: window.location.hostname });
 
 const statusEl = document.getElementById('status');
 
@@ -730,7 +758,7 @@ function initializeSensorDataSystem() {
     console.log('🚀 Initializing sensor data playback system...');
 
     // Start with first data point
-    const initialData = getCurrentSensorData();
+    const initialData = window.getCurrentSensorData();
     updateDashboardWithSensorData(initialData);
 
     // Start automatic playback
@@ -816,7 +844,7 @@ function pauseSensorDataPlayback() {
 // Reset sensor data playback to beginning
 function resetSensorDataPlayback() {
     resetSensorPlayback();
-    const initialData = getCurrentSensorData();
+    const initialData = window.getCurrentSensorData();
     updateDashboardWithSensorData(initialData);
     console.log('🔄 Sensor data playback reset to beginning');
 }
@@ -835,7 +863,7 @@ setTimeout(() => {
     // Force update model performance metrics after initialization
     setTimeout(() => {
         console.log('🔧 Forcing model performance metrics update...');
-        const sampleData = getCurrentSensorData();
+        const sampleData = window.getCurrentSensorData();
         console.log('📊 Sample enhanced data:', sampleData);
 
         // Update model performance elements directly
@@ -2067,7 +2095,7 @@ function forceHydraulicDataUpdate() {
     console.log('🔧 DIRECT: Forcing hydraulic data update with current leak state');
 
     // Get current sensor data to generate fresh hydraulic data
-    const currentData = getCurrentSensorData();
+    const currentData = window.getCurrentSensorData();
     console.log('📊 Current sensor data for hydraulic update:', currentData);
 
     // Update hydraulic data immediately with current leak state
