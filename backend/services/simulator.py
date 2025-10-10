@@ -52,6 +52,10 @@ class DataSimulator:
 
 	def trigger_leak(self, pipe_id: str, severity: float) -> None:
 		self._leak = {"pipe_id": pipe_id, "severity": max(0.0, min(severity, 1.0))}
+		# Also apply leak to hydraulic model
+		hyd = registry.get_hydraulic()
+		if hyd is not None:
+			hyd.apply_leak(pipe_id, severity)
 
 	def trigger_demand_spike(self, multiplier: float, duration_s: int) -> None:
 		self._demand_multiplier = max(0.1, multiplier)
@@ -249,34 +253,34 @@ class DataSimulator:
 		}
 
 	def _generate_ml_metrics(self, timestep: int) -> Dict[str, float]:
-		"""Generate simple ML model performance metrics for leak confidence"""
+		"""Generate ML model performance metrics with fixed AUC for consistent display"""
 
-		# Simple baseline - low confidence when no leak
-		base_accuracy = 0.65  # Low baseline accuracy
-		base_precision = 0.60
-		base_recall = 0.62
-		base_auc = 0.68
+		# Fixed baseline values for consistency
+		base_accuracy = 0.78
+		base_precision = 0.75
+		base_recall = 0.80
+		base_auc = 0.84  # Fixed AUC value as requested
 
-		# Add small random variation
-		variation = random.uniform(-0.05, 0.05)
+		# Minimal random variation for stability
+		variation = random.uniform(-0.02, 0.02)
 
 		if self._leak is not None:
-			# High confidence when leak is present
-			leak_boost = self._leak["severity"] * 0.3  # Strong boost based on severity
-			accuracy = min(0.95, base_accuracy + leak_boost + variation)
-			precision = min(0.93, base_precision + leak_boost * 0.9 + variation)
-			recall = min(0.94, base_recall + leak_boost * 1.1 + variation)
-			auc = min(0.96, base_auc + leak_boost + variation)
+			# Enhanced confidence when leak is present
+			leak_boost = self._leak["severity"] * 0.15
+			accuracy = min(0.92, base_accuracy + leak_boost + variation)
+			precision = min(0.90, base_precision + leak_boost * 0.8 + variation)
+			recall = min(0.93, base_recall + leak_boost * 0.9 + variation)
+			auc = min(0.95, base_auc + leak_boost * 0.05 + variation)  # AUC improves with leak detection
 		else:
-			# Low confidence when no leak (10-20% range)
-			accuracy = max(0.55, base_accuracy + variation)  # 55-70% = 10-20% confidence
-			precision = max(0.50, base_precision + variation)
-			recall = max(0.52, base_recall + variation)
-			auc = max(0.58, base_auc + variation)
+			# Moderate confidence when no leak
+			accuracy = max(0.70, base_accuracy + variation)
+			precision = max(0.68, base_precision + variation)
+			recall = max(0.72, base_recall + variation)
+			auc = max(0.80, base_auc + variation)  # Maintain high AUC even without leaks
 
 		return {
 			"accuracy": max(0.5, min(0.99, accuracy)),
 			"precision": max(0.5, min(0.99, precision)),
 			"recall": max(0.5, min(0.99, recall)),
-			"auc": max(0.5, min(0.99, auc))
+			"auc": max(0.75, min(0.95, auc))  # Keep AUC in realistic range
 		}

@@ -914,42 +914,59 @@ function resetSensorDataPlayback() {
     console.log('🔄 Sensor data playback reset to beginning');
 }
 
-// Initialize the sensor data system
-setTimeout(() => {
-    console.log('🚀 Starting sensor data system initialization...');
-    initializeSensorDataSystem();
+// Initialize the sensor data system with proper readiness check
+function initializeSensorDataSystemWhenReady() {
+    console.log('🚀 Checking sensor data system readiness...');
 
-    // Initialize AUC monitoring graph if available
-    if (window.initAUCMonitoring) {
-        window.initAUCMonitoring();
-        console.log('📊 AUC monitoring graph initialized');
+    // Check if sensor data is ready
+    if (window.sensorDataReady && window.getCurrentSensorData && window.getNextSensorData) {
+        console.log('✅ Sensor data system is ready, initializing...');
+        initializeSensorDataSystem();
+
+        // Initialize AUC monitoring graph if available
+        if (window.initAUCMonitoring) {
+            window.initAUCMonitoring();
+            console.log('📊 AUC monitoring graph initialized');
+        }
+
+        // Force update model performance metrics after initialization
+        setTimeout(() => {
+            console.log('🔧 Forcing model performance metrics update...');
+            const sampleData = window.getCurrentSensorData();
+            console.log('📊 Sample enhanced data:', sampleData);
+
+            // Update model performance elements directly
+            const accScoreEl = document.getElementById('accScore');
+            const precScoreEl = document.getElementById('precScore');
+            const recScoreEl = document.getElementById('recScore');
+            const aucScoreEl = document.getElementById('aucScore');
+
+            if (accScoreEl) accScoreEl.textContent = (sampleData.accuracy * 100).toFixed(2) + '%';
+            if (precScoreEl) precScoreEl.textContent = (sampleData.precision * 100).toFixed(2) + '%';
+            if (recScoreEl) recScoreEl.textContent = (sampleData.recall * 100).toFixed(2) + '%';
+            if (aucScoreEl) aucScoreEl.textContent = (sampleData.auc * 100).toFixed(2) + '%';
+
+            console.log('✅ Model performance metrics forced update:', {
+                accuracy: (sampleData.accuracy * 100).toFixed(2) + '%',
+                precision: (sampleData.precision * 100).toFixed(2) + '%',
+                recall: (sampleData.recall * 100).toFixed(2) + '%',
+                auc: (sampleData.auc * 100).toFixed(2) + '%'
+            });
+        }, 1000);
+
+        return true;
+    } else {
+        console.log('⏳ Sensor data system not ready yet, waiting...');
+        // Wait and try again
+        setTimeout(initializeSensorDataSystemWhenReady, 100);
+        return false;
     }
+}
 
-    // Force update model performance metrics after initialization
-    setTimeout(() => {
-        console.log('🔧 Forcing model performance metrics update...');
-        const sampleData = window.getCurrentSensorData();
-        console.log('📊 Sample enhanced data:', sampleData);
-
-        // Update model performance elements directly
-        const accScoreEl = document.getElementById('accScore');
-        const precScoreEl = document.getElementById('precScore');
-        const recScoreEl = document.getElementById('recScore');
-        const aucScoreEl = document.getElementById('aucScore');
-
-        if (accScoreEl) accScoreEl.textContent = (sampleData.accuracy * 100).toFixed(2) + '%';
-        if (precScoreEl) precScoreEl.textContent = (sampleData.precision * 100).toFixed(2) + '%';
-        if (recScoreEl) recScoreEl.textContent = (sampleData.recall * 100).toFixed(2) + '%';
-        if (aucScoreEl) aucScoreEl.textContent = (sampleData.auc * 100).toFixed(2) + '%';
-
-        console.log('✅ Model performance metrics forced update:', {
-            accuracy: (sampleData.accuracy * 100).toFixed(2) + '%',
-            precision: (sampleData.precision * 100).toFixed(2) + '%',
-            recall: (sampleData.recall * 100).toFixed(2) + '%',
-            auc: (sampleData.auc * 100).toFixed(2) + '%'
-        });
-    }, 1000);
-
+// Start the initialization process
+setTimeout(() => {
+    console.log('🚀 Starting sensor data system initialization check...');
+    initializeSensorDataSystemWhenReady();
 }, 500);
 
 // Initialize mode toggle after initial setup

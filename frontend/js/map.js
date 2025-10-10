@@ -839,21 +839,22 @@ function updateTooltipContent(pipe, acousticData, aiData) {
     const endNode = networkNodes[pipe.endNode];
 
     if (startNode && endNode) {
-        // Show average of connected node flows (matches what user sees on screen)
-        const avgNodeFlow = (startNode.flow + endNode.flow) / 2;
-        document.getElementById('tooltipFlow').textContent = `${avgNodeFlow.toFixed(1)} L/s`;
+        // Show individual node flows that match screen display exactly
+        const startFlow = startNode.flow.toFixed(1);
+        const endFlow = endNode.flow.toFixed(1);
+        document.getElementById('tooltipFlow').textContent = `${startFlow} L/s`;
 
-        // Calculate velocity based on node flows and pipe diameter
+        // Calculate velocity based on start node flow (matches screen logic)
         const crossSectionalArea = Math.PI * Math.pow(pipe.diameter / 2000, 2); // m²
-        const avgVelocity = avgNodeFlow / 1000 / crossSectionalArea; // m/s
-        document.getElementById('tooltipVelocity').textContent = `${avgVelocity.toFixed(1)} m/s`;
+        const velocity = parseFloat(startFlow) / 1000 / crossSectionalArea; // m/s
+        document.getElementById('tooltipVelocity').textContent = `${velocity.toFixed(1)} m/s`;
 
-        console.log('🔧 Tooltip flow values:', {
-            startNodeFlow: startNode.flow.toFixed(1),
-            endNodeFlow: endNode.flow.toFixed(1),
-            avgFlow: avgNodeFlow.toFixed(1),
-            pipeFlow: pipe.flow.toFixed(1),
-            calculatedVelocity: avgVelocity.toFixed(1)
+        console.log('🔧 Tooltip flow values (FIXED):', {
+            startNodeFlow: startFlow,
+            endNodeFlow: endFlow,
+            tooltipShows: startFlow,
+            screenShows: startFlow,
+            calculatedVelocity: velocity.toFixed(1)
         });
     } else {
         // Fallback to pipe values if nodes not available
@@ -1178,73 +1179,85 @@ function drawEpanetPipe(pipe) {
 
     if (!startNode || !endNode) return;
 
-    // Determine pipe color and style based on status
-    let pipeColor = '#96ceb4'; // Normal
-    let lineWidth = Math.max(2, pipe.diameter / 100);
-
-    if (activeScenarios[pipe.id]) {
-        const severity = activeScenarios[pipe.id];
-        pipeColor = `rgba(255, 107, 53, ${0.6 + severity * 0.4})`; // Leaking
-        lineWidth = Math.max(4, pipe.diameter / 80);
-    } else if (pipe.velocity > 1.5) {
-        pipeColor = '#ffd93d'; // High velocity
-        lineWidth = Math.max(3, pipe.diameter / 90);
-    }
-
-    // Draw pipe line
-    ctx.strokeStyle = pipeColor;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-
-    // Draw main pipe
-    ctx.beginPath();
-    ctx.moveTo(startNode.x, startNode.y);
-    ctx.lineTo(endNode.x, endNode.y);
-    ctx.stroke();
-
-    // Draw selection highlight
-    if (epanetSelectedPipe === pipe.id) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = lineWidth + 4;
-        ctx.globalAlpha = 0.6;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-    }
-
-    // Draw flow direction indicator
-    const midX = (startNode.x + endNode.x) / 2;
-    const midY = (startNode.y + endNode.y) / 2;
-    const angle = Math.atan2(endNode.y - startNode.y, endNode.x - startNode.x);
-
-    // Draw arrow for flow direction
+    // Save context state before making changes
     ctx.save();
-    ctx.translate(midX, midY);
-    ctx.rotate(angle);
 
-    // Arrow shaft
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-15, 0);
-    ctx.lineTo(15, 0);
-    ctx.stroke();
+    try {
+        // Determine pipe color and style based on status
+        let pipeColor = '#96ceb4'; // Normal
+        let lineWidth = Math.max(2, pipe.diameter / 100);
 
-    // Arrow head
-    ctx.fillStyle = '#22c55e';
-    ctx.beginPath();
-    ctx.moveTo(15, 0);
-    ctx.lineTo(10, -4);
-    ctx.lineTo(10, 4);
-    ctx.closePath();
-    ctx.fill();
+        if (activeScenarios[pipe.id]) {
+            const severity = activeScenarios[pipe.id];
+            pipeColor = `rgba(255, 107, 53, ${0.6 + severity * 0.4})`; // Leaking
+            lineWidth = Math.max(4, pipe.diameter / 80);
+        } else if (pipe.velocity > 1.5) {
+            pipeColor = '#ffd93d'; // High velocity
+            lineWidth = Math.max(3, pipe.diameter / 90);
+        }
 
-    ctx.restore();
+        // Draw pipe line
+        ctx.strokeStyle = pipeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = 1.0; // Ensure full opacity
 
-    // Draw pipe label
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px Inter';
-    ctx.textAlign = 'center';
-    ctx.fillText(pipe.id, midX, midY - 8);
+        // Draw main pipe
+        ctx.beginPath();
+        ctx.moveTo(startNode.x, startNode.y);
+        ctx.lineTo(endNode.x, endNode.y);
+        ctx.stroke();
+
+        // Draw selection highlight
+        if (epanetSelectedPipe === pipe.id) {
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = lineWidth + 4;
+            ctx.globalAlpha = 0.6;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0; // Reset alpha
+        }
+
+        // Draw flow direction indicator
+        const midX = (startNode.x + endNode.x) / 2;
+        const midY = (startNode.y + endNode.y) / 2;
+        const angle = Math.atan2(endNode.y - startNode.y, endNode.x - startNode.x);
+
+        // Draw arrow for flow direction
+        ctx.translate(midX, midY);
+        ctx.rotate(angle);
+
+        // Arrow shaft
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.lineTo(15, 0);
+        ctx.stroke();
+
+        // Arrow head
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(10, -4);
+        ctx.lineTo(10, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.rotate(-angle); // Reset rotation
+        ctx.translate(-midX, -midY); // Reset translation
+
+        // Draw pipe label
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 1.0;
+        ctx.fillText(pipe.id, midX, midY - 8);
+
+    } finally {
+        // Always restore context state
+        ctx.restore();
+    }
 }
 
 /**

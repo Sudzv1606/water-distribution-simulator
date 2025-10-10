@@ -82,13 +82,13 @@ class HydraulicModel:
 
 	def apply_leak(self, pipe_id: str, severity: float) -> None:
 		"""Apply leak effect to hydraulic model with realistic pressure propagation"""
-		print(f"🔧 HYDRAULIC: Applying leak to pipe {pipe_id} with severity {severity}")
-		print(f"🔍 HYDRAULIC: Current active leaks before: {self._active_leaks}")
-		print(f"🔍 HYDRAULIC: Available pipes: {[link[0] for link in self._links]}")
+		print(f"HYDRAULIC: Applying leak to pipe {pipe_id} with severity {severity}")
+		print(f"HYDRAULIC: Current active leaks before: {self._active_leaks}")
+		print(f"HYDRAULIC: Available pipes: {[link[0] for link in self._links]}")
 
 		# Store the leak
 		self._active_leaks[pipe_id] = severity
-		print(f"✅ HYDRAULIC: Stored leak {pipe_id} -> {severity}")
+		print(f"HYDRAULIC: Stored leak {pipe_id} -> {severity}")
 
 		# Build connectivity graph if not already built
 		if not self._connectivity_graph:
@@ -102,11 +102,11 @@ class HydraulicModel:
 				break
 
 		if not pipe_endpoints:
-			print(f"❌ HYDRAULIC: Pipe {pipe_id} not found in network")
-			print(f"🔍 HYDRAULIC: Available links: {self._links}")
+			print(f"HYDRAULIC: Pipe {pipe_id} not found in network")
+			print(f"HYDRAULIC: Available links: {self._links}")
 			return
 
-		print(f"✅ HYDRAULIC: Found pipe endpoints: {pipe_endpoints}")
+		print(f"HYDRAULIC: Found pipe endpoints: {pipe_endpoints}")
 
 		# Calculate pressure drops using BFS propagation
 		self._calculate_leak_pressure_drops(pipe_endpoints, severity)
@@ -114,8 +114,8 @@ class HydraulicModel:
 		# Calculate flow changes based on pressure drops
 		self._calculate_flow_changes()
 
-		print(f"✅ HYDRAULIC: Leak applied successfully. Modified pressures: {self._modified_pressures}")
-		print(f"🔍 HYDRAULIC: Active leaks after: {self._active_leaks}")
+		print(f"HYDRAULIC: Leak applied successfully. Modified pressures: {self._modified_pressures}")
+		print(f"HYDRAULIC: Active leaks after: {self._active_leaks}")
 
 	def _build_connectivity_graph(self) -> None:
 		"""Build undirected graph for connectivity analysis"""
@@ -126,7 +126,7 @@ class HydraulicModel:
 				self._connectivity_graph[source].append(target)
 				self._connectivity_graph[target].append(source)
 
-		print(f"✅ HYDRAULIC: Built connectivity graph with {len(self._connectivity_graph)} nodes")
+		print(f"HYDRAULIC: Built connectivity graph with {len(self._connectivity_graph)} nodes")
 
 	def _calculate_leak_pressure_drops(self, pipe_endpoints: Tuple[str, str], severity: float) -> None:
 		"""Calculate pressure drops using BFS propagation from leak location"""
@@ -162,7 +162,7 @@ class HydraulicModel:
 			new_pressure = max(10.0, old_pressure - pressure_drop)  # Minimum 10 psi
 			self._modified_pressures[node] = new_pressure
 
-			print(f"  📉 HYDRAULIC: Node {node}: {old_pressure:.1f} → {new_pressure:.1f} psi (drop: {pressure_drop:.1f})")
+			print(f"  HYDRAULIC: Node {node}: {old_pressure:.1f} to {new_pressure:.1f} psi (drop: {pressure_drop:.1f})")
 
 			# Continue propagation to connected nodes
 			for neighbor in self._connectivity_graph.get(node, []):
@@ -170,32 +170,56 @@ class HydraulicModel:
 					queue.append((neighbor, distance + 1))
 
 	def _calculate_flow_changes(self) -> None:
-		"""Calculate flow rate changes based on pressure drops"""
-		# Simple flow calculation: flow proportional to pressure difference
-		# In a real system, this would use more sophisticated hydraulic equations
+		"""Calculate flow rate changes based on pressure drops with proper leak modeling"""
+		# Get all active leaks
+		leaky_pipes = set(self._active_leaks.keys())
 
+		# Track calculated flows for mass balance
+		node_inflows = {node: 0.0 for node in self._nodes}
+		node_outflows = {node: 0.0 for node in self._nodes}
+
+		# First pass: Calculate flows considering leaks and mass balance
 		for link_id, source, target in self._links:
 			source_pressure = self._modified_pressures.get(source, 52.0)
 			target_pressure = self._modified_pressures.get(target, 52.0)
 
-			# Calculate pressure difference
+			# Base flow calculation using pressure difference
 			pressure_diff = abs(source_pressure - target_pressure)
-
-			# Base flow calculation (simplified Darcy-Weisbach)
 			baseline_flow = self._baseline_flow.get(link_id, 60.0)
 
-			# Flow reduction due to pressure drops
-			# Lower pressures = reduced flow capacity
+			# Pressure factor affects flow capacity
 			avg_pressure = (source_pressure + target_pressure) / 2
-			pressure_factor = avg_pressure / 52.0  # Normalize to baseline
+			pressure_factor = max(0.3, avg_pressure / 52.0)
 
-			# Apply realistic flow reduction
-			new_flow = baseline_flow * max(0.3, pressure_factor * (1.0 - self._get_pipe_leak_factor(link_id)))
+			if link_id in leaky_pipes:
+				# This pipe has a leak - apply mass balance
+				leak_severity = self._active_leaks[link_id]
 
-			# Store modified flow (update baseline_flow for simulator to use)
+				# Calculate leak flow rate based on pressure and severity
+				leak_pressure = min(source_pressure, target_pressure)
+				leak_flow = baseline_flow * leak_severity * 0.4 * (leak_pressure / 52.0)
+
+				# Apply mass balance: outflow = inflow - leak
+				# For pipes with leaks, reduce the downstream flow
+				new_flow = baseline_flow * pressure_factor - leak_flow
+
+				print(f"  HYDRAULIC: Pipe {link_id} LEAK: baseline {baseline_flow:.1f} to calculated {baseline_flow * pressure_factor:.1f} to after leak {new_flow:.1f} L/s (leak: {leak_flow:.1f} L/s)")
+			else:
+				# Normal pipe - standard flow calculation
+				leak_factor = self._get_pipe_leak_factor(link_id)
+				new_flow = baseline_flow * pressure_factor * (1.0 - leak_factor)
+
+				print(f"  HYDRAULIC: Pipe {link_id}: flow {baseline_flow:.1f} to {new_flow:.1f} L/s")
+
+			# Ensure flow doesn't go negative
+			new_flow = max(0.0, new_flow)
+
+			# Store modified flow
 			self._baseline_flow[link_id] = new_flow
 
-			print(f"  🌊 HYDRAULIC: Pipe {link_id}: flow {baseline_flow:.1f} → {new_flow:.1f} L/s")
+			# Track for mass balance verification (optional)
+			node_inflows[target] += new_flow
+			node_outflows[source] += new_flow
 
 	def _get_pipe_leak_factor(self, pipe_id: str) -> float:
 		"""Get additional flow reduction factor if pipe has a leak"""
@@ -206,7 +230,7 @@ class HydraulicModel:
 
 	def apply_demand_spike(self, multiplier: float, duration_s: int) -> None:
 		"""Apply demand spike effect to hydraulic model"""
-		print(f"⚡ HYDRAULIC: Applying demand spike: {multiplier}x for {duration_s}s")
+		print(f"HYDRAULIC: Applying demand spike: {multiplier}x for {duration_s}s")
 
 		# Apply pressure reduction across all nodes
 		self._modified_pressures = {}
@@ -216,20 +240,20 @@ class HydraulicModel:
 			new_pressure = baseline_pressure * reduction_factor
 			self._modified_pressures[node_id] = new_pressure
 
-		print(f"✅ HYDRAULIC: Demand spike applied. Pressures reduced by {((1.0 - reduction_factor) * 100):.1f}%")
+		print(f"HYDRAULIC: Demand spike applied. Pressures reduced by {((1.0 - reduction_factor) * 100):.1f}%")
 
 	def clear_leaks(self) -> None:
 		"""Clear all active leaks and reset to baseline pressures"""
-		print("🧹 HYDRAULIC: Clearing all leaks")
-		print(f"🔍 HYDRAULIC: Active leaks before clear: {self._active_leaks}")
+		print("HYDRAULIC: Clearing all leaks")
+		print(f"HYDRAULIC: Active leaks before clear: {self._active_leaks}")
 
 		self._active_leaks.clear()
 		self._modified_pressures = self._baseline_pressure.copy()
 
 		# Reset flows to baseline
 		# Note: In a real implementation, you might want to store original flows separately
-		print("✅ HYDRAULIC: All leaks cleared, pressures reset to baseline")
-		print(f"🔍 HYDRAULIC: Active leaks after clear: {self._active_leaks}")
+		print("HYDRAULIC: All leaks cleared, pressures reset to baseline")
+		print(f"HYDRAULIC: Active leaks after clear: {self._active_leaks}")
 
 	def get_modified_pressures(self) -> Dict[str, float]:
 		"""Get current modified pressures (including leak effects)"""
